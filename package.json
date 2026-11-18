@@ -1,0 +1,20 @@
+{
+  "name": "rentevent",
+  "private": true,
+  "packageManager": "pnpm@9.12.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "pnpm --filter @rentevent/web dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:e2e": "pnpm --filter @rentevent/web test:e2e",
+    "db:setup": "pnpm --filter @rentevent/db setup",
+    "db:generate": "pnpm --filter @rentevent/db generate",
+    "db:migrate": "pnpm --filter @rentevent/db migrate",
+    "db:seed": "pnpm --filter @rentevent/db seed",
+    "db:reset": "pnpm --filter @rentevent/db reset",
+    "worker": "pnpm --filter @rentevent/web worker"
+  }
+}
