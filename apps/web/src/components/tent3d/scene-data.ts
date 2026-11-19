@@ -14,6 +14,7 @@ import {
   type Composition,
   type CoverageGap,
   type StructureFamily,
+  type TentConfiguration,
   type TentPart,
   type Vec2,
 } from "@rentevent/core";
@@ -31,7 +32,8 @@ export type MatKey =
   | "hormigon"
   | "mesa"
   | "silla"
-  | "canalon";
+  | "canalon"
+  | "hueco";
 
 export type InstanceBatch = { shape: "box" | "cylinder"; mat: MatKey; matrices: THREE.Matrix4[] };
 
@@ -45,6 +47,8 @@ export type SceneMesh = {
   mat: MatKey;
   /** local → world transform */
   matrix: THREE.Matrix4;
+  /** placeholder for an empty slot (no roof, open side, no front): clickable only while editing */
+  ghost?: boolean;
 };
 
 export type TentInfo = {
@@ -141,7 +145,16 @@ function addBatch(batches: Map<string, InstanceBatch>, shape: InstanceBatch["sha
   b.matrices.push(m);
 }
 
-export function buildScene(input: { composition: Composition; families: StructureFamily[]; items: BomItem[]; rules: BomRule[] }): SceneData {
+/** Same configuration with every roof, side and front closed: used to know where empty slots are. */
+function closedConfig(config: TentConfiguration): TentConfiguration {
+  return {
+    ...config,
+    bays: config.bays.map((b) => ({ ...b, roof: b.roof === "ninguno" ? "blanco" : b.roof, left: b.left === "abierto" ? "blanco" : b.left, right: b.right === "abierto" ? "blanco" : b.right })),
+    fronts: { start: { ...config.fronts.start, type: "completo" }, end: { ...config.fronts.end, type: "completo" } },
+  };
+}
+
+export function buildScene(input: { composition: Composition; families: StructureFamily[]; items: BomItem[]; rules: BomRule[]; editable?: boolean }): SceneData {
   const fams = new Map(input.families.map((f) => [f.id, f]));
   const batches = new Map<string, InstanceBatch>();
   const meshes: SceneMesh[] = [];
@@ -169,6 +182,19 @@ export function buildScene(input: { composition: Composition; families: Structur
 
     const world = (m: THREE.Matrix4) => new THREE.Matrix4().multiplyMatrices(T, m);
     const pushMesh = (key: string, geometry: THREE.BufferGeometry, mat: MatKey, target?: PickTarget) => meshes.push({ key: `${t.id}:${key}`, tentId: t.id, target, geometry, mat, matrix: T });
+
+    // Empty slots (roof removed, open side, open or gable-less front) get a clickable placeholder
+    // while editing, so a removed cover can always be put back. Never part of the BOM or exports.
+    if (input.editable && !isJaima) {
+      const present = new Set(parts.map((p) => p.id));
+      for (const p of generateTentParts(closedConfig(t.config), fam)) {
+        if (!p.target || present.has(p.id)) continue;
+        const s = p.shape;
+        const geometry =
+          s.kind === "roof" ? roofGeometry(s.x0, s.x1, s.profile, 0.05) : s.kind === "wall" ? wallGeometry(s.x0, s.x1, s.z, 0, s.height) : s.kind === "gable" ? gableGeometry(s.x, s.profile) : s.kind === "frontwall" ? frontGeometry(s.x, s.z0, s.z1, 0, s.height) : null;
+        if (geometry) meshes.push({ key: `${t.id}:ghost:${p.id}`, tentId: t.id, target: p.target, geometry, mat: "hueco", matrix: T, ghost: true });
+      }
+    }
 
     for (const p of drawable) {
       const s = p.shape;
@@ -298,6 +324,7 @@ export function materials(): Record<MatKey, THREE.Material> {
     transparente: std({ color: "#cfe3f5", roughness: 0.1, metalness: 0, transparent: true, opacity: 0.28, depthWrite: false }),
     ventana_cristal: std({ color: "#a9c9e6", roughness: 0.1, transparent: true, opacity: 0.55, depthWrite: false }),
     puerta_hueco: std({ color: "#3a3a38", roughness: 0.9 }),
+    hueco: std({ color: "#f95f40", roughness: 1, transparent: true, opacity: 0.1, depthWrite: false }),
     metal: std({ color: "#8e9399", roughness: 0.45, metalness: 0.6 }),
     madera: std({ color: "#b78a5a", roughness: 0.8 }),
     suelo: std({ color: "#8d8f91", roughness: 0.9 }),

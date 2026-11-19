@@ -163,7 +163,7 @@ export function VisorClient({ families, items, rules, vehicles }: Props) {
           </TabsContent>
         </Tabs>
         <p className="text-xs text-muted-foreground">
-          Haz clic en una lona de techo, un lateral o un frente para cambiar su tipo. El despiece, el peso y las horas se recalculan al instante.
+          Haz clic en una lona de techo, un lateral o un frente para cambiar su tipo. Los huecos sin lona se marcan en color: haz clic en ellos para volver a ponerla. El despiece, el peso y las horas se recalculan al instante.
         </p>
       </div>
 

@@ -88,8 +88,9 @@ function PickMesh({ mesh, hovered, interactive, onHover, onPick }: { mesh: Scene
       matrix={mesh.matrix}
       matrixAutoUpdate={false}
       castShadow={mesh.mat === "blanco"}
-      receiveShadow
-      renderOrder={mesh.mat === "transparente" || mesh.mat === "ventana_cristal" ? 2 : 0}
+      receiveShadow={!mesh.ghost}
+      userData={mesh.ghost ? { helper: true, ghost: true } : undefined}
+      renderOrder={mesh.mat === "transparente" || mesh.mat === "ventana_cristal" || mesh.ghost ? 2 : 0}
       onPointerOver={
         interactive
           ? (e) => {
@@ -269,7 +270,7 @@ function Lights({ bounds }: { bounds: THREE.Box3 }) {
 
 export default function TentViewer(props: TentViewerProps) {
   const { composition, families, items, rules, editable, selectedTentId, onChange, onSelectTent, showHuman = true, showDimensions = true, className, apiRef } = props;
-  const data = useMemo(() => buildScene({ composition, families, items, rules }), [composition, families, items, rules]);
+  const data = useMemo(() => buildScene({ composition, families, items, rules, editable }), [composition, families, items, rules, editable]);
   const [hover, setHover] = useState<SceneMesh | null>(null);
   const bridge = useRef<Bridge | null>(null);
   const famById = useMemo(() => new Map(families.map((f) => [f.id, f])), [families]);
@@ -286,8 +287,16 @@ export default function TentViewer(props: TentViewerProps) {
       async toPNG() {
         const b = bridge.current;
         if (!b) throw new Error("Visor no listo");
+        // empty-slot placeholders are an editing aid, not part of the tent
+        const ghosts: THREE.Object3D[] = [];
+        b.scene.traverse((o) => {
+          if (o.userData?.ghost && o.visible) ghosts.push(o);
+        });
+        ghosts.forEach((o) => (o.visible = false));
         b.gl.render(b.scene, b.camera);
-        return new Promise<Blob>((res, rej) => b.gl.domElement.toBlob((x) => (x ? res(x) : rej(new Error("PNG vacío"))), "image/png"));
+        const blob = new Promise<Blob>((res, rej) => b.gl.domElement.toBlob((x) => (x ? res(x) : rej(new Error("PNG vacío"))), "image/png"));
+        ghosts.forEach((o) => (o.visible = true));
+        return blob;
       },
       async toGLTF() {
         const b = bridge.current;
