@@ -17,7 +17,15 @@ const errors: string[] = [];
 page.on("pageerror", (e) => errors.push(e.message));
 page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 for (const p of paths) {
-  await page.goto(`${base}${p}`, { waitUntil: "networkidle", timeout: 60000 });
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      await page.goto(`${base}${p}`, { waitUntil: "load", timeout: 90000 });
+      break;
+    } catch (e) {
+      if (attempt === 2) throw e;
+      await page.waitForTimeout(1500);
+    }
+  }
   await page.waitForTimeout(Number(process.env.SHOT_WAIT ?? 600));
   const file = `${out}/shot${p.replace(/[^a-z0-9]+/gi, "_")}.png`;
   await page.screenshot({ path: file, fullPage: Boolean(process.env.SHOT_FULL) });
