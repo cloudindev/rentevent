@@ -8,7 +8,8 @@ import { UserError } from "./action";
 import { loadCatalogue } from "./orders";
 
 /** Writes lines, tent configurations and BOM sub-lines; the server recomputes everything. */
-export async function persistLines(tx: Tx, orderId: string, lines: WorkLine[]) {
+export async function persistLines(tx: Tx, orderId: string, lines: WorkLine[]): Promise<Record<string, string>> {
+  const configIds: Record<string, string> = {};
   const cat = await loadCatalogue(tx);
   const { boms } = materialOf(lines, cat);
   const famById = new Map(cat.families.map((f) => [f.id, f]));
@@ -37,6 +38,7 @@ export async function persistLines(tx: Tx, orderId: string, lines: WorkLine[]) {
       const label = tentLabel(l, cat);
       if (tcId) await tx.update(tentConfigurations).set({ composition: l.composition, bom: bom.lines, metrics, label }).where(eq(tentConfigurations.id, tcId));
       else tcId = (await tx.insert(tentConfigurations).values({ orderId, composition: l.composition, bom: bom.lines, metrics, label, shareToken: randomBytes(12).toString("base64url") }).returning({ id: tentConfigurations.id }))[0]!.id;
+      configIds[l.key] = tcId;
       const mine = rows.filter((r) => r.lineKey === l.key);
       const parent = mine.find((r) => r.parent) ?? mine[0];
       const [p] = await tx
@@ -63,5 +65,6 @@ export async function persistLines(tx: Tx, orderId: string, lines: WorkLine[]) {
     }
   }
   await syncReservations(tx, orderId);
+  return configIds;
 }
 

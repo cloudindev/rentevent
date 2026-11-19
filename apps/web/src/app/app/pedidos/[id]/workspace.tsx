@@ -31,16 +31,24 @@ export function OrderWorkspace({ data, perms }: { data: OrderWorkspaceData; perm
   const [headerOpen, setHeaderOpen] = useState(false);
   const viewerApi = useRef<TentViewerApi | null>(null);
   const savedLines = useRef(JSON.stringify(data.lines));
+  const ownSavedAt = useRef<string | null>(null);
+  const latest = useRef(lines);
+  latest.current = lines;
   const editable = perms.edit && !["devuelto", "cancelado"].includes(order.status);
 
   // server data refreshed (router.refresh) → adopt it if we have no local edits
   useEffect(() => {
     const incoming = JSON.stringify(data.lines);
+    if (data.order.updatedAt === ownSavedAt.current) {
+      // our own save coming back: keep local keys and selection
+      savedLines.current = incoming;
+      return;
+    }
     if (!dirty && incoming !== savedLines.current) {
       savedLines.current = incoming;
       setLines(data.lines);
     }
-  }, [data.lines, dirty]);
+  }, [data.lines, data.order.updatedAt, dirty]);
 
   const days = order.eventStart && order.eventEnd ? daysBetween(new Date(order.eventStart).getTime(), new Date(order.eventEnd).getTime()) : 1;
   const computed = useMemo(
@@ -82,8 +90,11 @@ export function OrderWorkspace({ data, perms }: { data: OrderWorkspaceData; perm
           toast.error(r.error);
           return;
         }
-        savedLines.current = JSON.stringify(snapshot);
-        setDirty(false);
+        ownSavedAt.current = r.data.savedAt;
+        const ids = r.data.configIds;
+        const editedMeanwhile = JSON.stringify(latest.current) !== JSON.stringify(snapshot);
+        setLines((cur) => cur.map((l) => (l.kind === "carpa" && !l.tentConfigId && ids[l.key] ? { ...l, tentConfigId: ids[l.key]! } : l)));
+        setDirty(editedMeanwhile);
         router.refresh();
       });
     }, 900);

@@ -129,7 +129,7 @@ export const saveOrderLines = tenantAction(z.object({ orderId: z.string().uuid()
   const [o] = await tx.select().from(orders).where(eq(orders.id, orderId)).for("update");
   if (!o) throw new UserError("Pedido no encontrado");
   if (["devuelto", "cancelado"].includes(o.status)) throw new UserError("El pedido está cerrado: reábrelo para editarlo.");
-  await persistLines(tx, orderId, lines as WorkLine[]);
+  const configIds = await persistLines(tx, orderId, lines as WorkLine[]);
   // a confirmed order must still fit: re-check under lock
   if (o.status === "confirmado" || o.status === "en_curso") {
     const checks = await checkOrderAvailability(tx, orderId);
@@ -143,7 +143,7 @@ export const saveOrderLines = tenantAction(z.object({ orderId: z.string().uuid()
   await audit(tx, ctx, "order", orderId, "editar", { lineas: lines.length });
   revalidatePath(`/app/pedidos/${orderId}`);
   const [fresh] = await tx.select({ updatedAt: orders.updatedAt }).from(orders).where(eq(orders.id, orderId));
-  return { savedAt: fresh!.updatedAt.toISOString() };
+  return { savedAt: fresh!.updatedAt.toISOString(), configIds };
 });
 
 const headerInput = z

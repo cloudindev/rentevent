@@ -1,0 +1,21 @@
+/** Dev helper: generates a quote from the UI for an order and downloads its PDF. */
+import { chromium } from "@playwright/test";
+const base = "http://localhost:3210";
+const [orderId] = process.argv.slice(2);
+const browser = await chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 1400 } });
+const page = await ctx.newPage();
+await page.request.post(`${base}/api/auth/sign-in/email`, { data: { email: "demo@rentevent.es", password: "Rentevent2026!" }, headers: { Origin: base } });
+await page.goto(`${base}/app/pedidos/${orderId}`, { waitUntil: "load", timeout: 90000 });
+await page.waitForTimeout(2000);
+await page.locator("tbody tr").first().click();
+await page.waitForTimeout(7000);
+await page.getByRole("button", { name: "Generar" }).click();
+await page.waitForTimeout(8000);
+await page.screenshot({ path: "/tmp/after-quote.png" });
+const href = await page.locator('a[href*="/presupuesto/"][href$="/pdf"]').first().getAttribute("href");
+const res = await page.request.get(`${base}${href}`);
+const fs = await import("node:fs");
+fs.writeFileSync("/tmp/new-quote.pdf", await res.body());
+console.log(href, res.status());
+await browser.close();
