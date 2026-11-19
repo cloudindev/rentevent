@@ -117,7 +117,7 @@ export function DataTable<T>({
   useEffect(() => {
     try {
       const raw = localStorage.getItem(`rv.cols.${entity}`);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration-safe read of a per-viewer preference
+       
       if (raw) setVisibility(JSON.parse(raw));
     } catch {
       /* storage unavailable */
