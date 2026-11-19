@@ -8,8 +8,8 @@ import { invoiceTotals, lineNet, type InvoiceLine } from "../finance/calc";
 import { INVOICE_KIND_LABELS, clientSnapshot, parseLines, type ClientSnapshot } from "../finance/invoicing";
 import { verifactuQrUrl } from "../finance/einvoice";
 
-const eur = (n: number) => new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(n);
-const num = (n: number) => new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 }).format(n);
+const eur = (n: number) => new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", useGrouping: "always" }).format(n);
+const num = (n: number) => new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2, useGrouping: "always" }).format(n);
 const date = (iso: string | null) => (iso ? new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`)) : "—");
 
 const s = StyleSheet.create({

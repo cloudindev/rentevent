@@ -4,7 +4,7 @@ import { Document, Image, Page, StyleSheet, Text, View, renderToBuffer } from "@
 import { contacts, deliveryNotes, eq, orders, projects, tenantSettings, venues, type Tx } from "@rentevent/db";
 import { getObject } from "@/lib/adapters/storage";
 
-const num = (n: number) => new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 }).format(n);
+const num = (n: number) => new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2, useGrouping: "always" }).format(n);
 const dt = (d: Date | null | undefined) => (d ? new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(d) : "—");
 
 export const pdfStyles = StyleSheet.create({

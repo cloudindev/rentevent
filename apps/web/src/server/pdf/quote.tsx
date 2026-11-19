@@ -9,8 +9,8 @@ import { env } from "@/lib/env";
 import { planToSvgString } from "@/components/tent3d/plan-svg";
 import { loadCatalog } from "../catalog";
 
-const eur = (n: number) => new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(n);
-const num = (n: number) => new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 }).format(n);
+const eur = (n: number) => new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", useGrouping: "always" }).format(n);
+const num = (n: number) => new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2, useGrouping: "always" }).format(n);
 const dt = (d: string | Date | null | undefined) =>
   d ? new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(d)) : "—";
 

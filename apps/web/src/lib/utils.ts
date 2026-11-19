@@ -5,8 +5,8 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const eur = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" });
-const num = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 });
+const eur = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", useGrouping: "always" });
+const num = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2, useGrouping: "always" });
 
 export const formatEUR = (n: number | null | undefined) => eur.format(Number(n ?? 0));
 export const formatNumber = (n: number | null | undefined) => num.format(Number(n ?? 0));
