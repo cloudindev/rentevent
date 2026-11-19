@@ -102,7 +102,7 @@ export default function HomePage() {
       <section className="bg-subtle py-20 sm:py-24">
         <Container>
           <div className="grid items-center gap-10 lg:grid-cols-2">
-            <SectionTitle eyebrow="Sectores" title="Del mercado navideño a la boda en la finca" intro="Una misma base para cualquier empresa que monta estructuras temporales." />
+            <SectionTitle eyebrow="Sectores" title="Gestiona alquileres y producciones de eventos en un solo lugar" intro="Una misma base para cualquier empresa que monta estructuras temporales." />
             <div className="relative overflow-hidden rounded-3xl">
               <Image
                 src={fotoEstructura}
