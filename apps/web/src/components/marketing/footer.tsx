@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/brand";
 import { MODULES, SOLUTIONS } from "./content";
-import { InstagramIcon, LinkedInIcon, XIcon, YouTubeIcon } from "./social";
 import { CookieSettingsLink } from "./cookie-consent";
 
 const COLS: { title: string; links: [string, string][] }[] = [
@@ -35,22 +34,7 @@ export function MarketingFooter() {
         <div className="grid gap-10 lg:grid-cols-[1.4fr_repeat(4,1fr)]">
           <div className="max-w-xs">
             <Logo height={22} />
-            <p className="mt-4 text-sm text-muted-foreground">Software para empresas de alquiler y montaje de carpas y estructuras para eventos. Hecho en Asturias.</p>
-            <div className="mt-5 flex gap-3 text-foreground/70">
-              {[
-                ["LinkedIn", LinkedInIcon],
-                ["Instagram", InstagramIcon],
-                ["YouTube", YouTubeIcon],
-                ["X", XIcon],
-              ].map(([label, Icon]) => {
-                const I = Icon as typeof LinkedInIcon;
-                return (
-                  <a key={label as string} href="#" aria-label={`Rentevent en ${label as string}`} className="rounded-md p-1.5 hover:bg-accent hover:text-foreground">
-                    <I className="size-4" />
-                  </a>
-                );
-              })}
-            </div>
+            <p className="mt-4 text-sm text-muted-foreground">Software para empresas de alquiler y montaje de carpas y estructuras para eventos.</p>
           </div>
           {COLS.map((c) => (
             <div key={c.title}>

@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, CalendarCheck, Cuboid, HardHat, Plug, ShieldCheck, Tent } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppDemo } from "@/components/marketing/app-demo";
 import { MODULES, SOLUTIONS } from "@/components/marketing/content";
+import fotoEstructura from "@/assets/marketing/estructura-carpa.jpg";
+import fotoLuces from "@/assets/marketing/luces-cristal.jpg";
+import fotoMontaje from "@/assets/marketing/montaje-iluminacion.jpg";
 import { CheckList, ClientLogos, Container, FeatureRow, FinalCta, MiniVisual, SectionTitle } from "@/components/marketing/sections";
 
 export const metadata: Metadata = {
@@ -29,7 +33,7 @@ export default function HomePage() {
             <p className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm text-muted-foreground">
               <span className="size-1.5 rounded-full bg-brand-500" /> Para empresas de carpas y estructuras
             </p>
-            <h1 className="mt-6 text-4xl font-bold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">El software que sabe lo que es una carpa.</h1>
+            <h1 className="mt-6 text-4xl font-bold leading-[1.05] tracking-tight sm:text-5xl lg:text-[3.5rem]">Software gestión eventos y producciones audiovisuales</h1>
             <p className="mt-6 max-w-xl text-lg text-muted-foreground sm:text-xl">
               Presupuesta una 15x30 en dos minutos: despiece automático, cerchas disponibles en vivo y la carpa en 3D para tu cliente.
             </p>
@@ -53,6 +57,28 @@ export default function HomePage() {
 
       <ClientLogos />
 
+      <section className="pb-4 pt-16 sm:pt-20">
+        <Container>
+          <div className="relative overflow-hidden rounded-3xl">
+            <Image
+              src={fotoMontaje}
+              alt="Técnico colocando focos en el truss de una carpa iluminada para un evento"
+              placeholder="blur"
+              sizes="(min-width: 1280px) 1200px, 100vw"
+              className="h-[420px] w-full object-cover sm:h-[520px]"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/40 to-transparent" aria-hidden />
+            <div className="absolute inset-0 flex items-end p-6 sm:items-center sm:p-12">
+              <div className="max-w-md text-white">
+                <p className="text-sm font-medium uppercase tracking-wider text-brand-300">Montaje e iluminación</p>
+                <p className="mt-3 text-3xl font-semibold leading-tight sm:text-4xl">De la primera cercha al último foco, en el mismo pedido.</p>
+                <p className="mt-4 text-white/80">Estructura, lonas, iluminación, sonido y personal técnico se planifican juntos, con su stock y su cuadrilla.</p>
+              </div>
+            </div>
+          </div>
+        </Container>
+      </section>
+
       <section className="py-20 sm:py-24">
         <Container>
           <SectionTitle center eyebrow="Por qué Rentevent" title="Tres cosas que un software genérico de alquiler no hace" />
@@ -75,7 +101,18 @@ export default function HomePage() {
 
       <section className="bg-subtle py-20 sm:py-24">
         <Container>
-          <SectionTitle eyebrow="Sectores" title="Del mercado navideño a la boda en la finca" intro="Una misma base para cualquier empresa que monta estructuras temporales." />
+          <div className="grid items-center gap-10 lg:grid-cols-2">
+            <SectionTitle eyebrow="Sectores" title="Del mercado navideño a la boda en la finca" intro="Una misma base para cualquier empresa que monta estructuras temporales." />
+            <div className="relative overflow-hidden rounded-3xl">
+              <Image
+                src={fotoEstructura}
+                alt="Estructura de arcos metálicos de una carpa vista desde abajo"
+                placeholder="blur"
+                sizes="(min-width: 1024px) 600px, 100vw"
+                className="h-64 w-full object-cover sm:h-80"
+              />
+            </div>
+          </div>
           <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {SOLUTIONS.map((s) => (
               <Link key={s.slug} href={`/soluciones/${s.slug}`} className="rounded-2xl border bg-background p-5 transition-colors hover:border-border-strong">
@@ -127,7 +164,9 @@ export default function HomePage() {
         </Container>
       </section>
 
-      <section className="border-y bg-subtle py-20">
+      <section className="relative isolate overflow-hidden border-y py-20">
+        <Image src={fotoLuces} alt="" aria-hidden placeholder="blur" fill sizes="100vw" className="-z-20 object-cover" />
+        <div className="absolute inset-0 -z-10 bg-background/65" aria-hidden />
         <Container className="grid items-center gap-10 lg:grid-cols-2">
           <div>
             <SectionTitle eyebrow="Integraciones" title="Se conecta con lo que ya usas" intro="Pagos, calendario, correo, mensajería y tu asesoría contable. Y una API abierta para todo lo demás." />
@@ -135,7 +174,7 @@ export default function HomePage() {
           </div>
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {INTEGRATIONS.map((i) => (
-              <li key={i} className="flex h-20 flex-col items-center justify-center gap-1.5 rounded-2xl border bg-background text-center text-sm font-medium">
+              <li key={i} className="flex h-20 flex-col items-center justify-center gap-1.5 rounded-2xl border bg-background/90 text-center shadow-sm text-sm font-medium">
                 <Plug className="size-4 text-muted-foreground" aria-hidden />
                 {i}
               </li>
