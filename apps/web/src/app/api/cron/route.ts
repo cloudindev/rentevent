@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * Vercel Cron (every 15 min, see vercel.json): drains the Postgres job queue
+ * Vercel Cron (daily on Hobby, see vercel.json; any external scheduler can call it more often): drains the Postgres job queue
  * and runs due scheduled workflows for every tenant.
  * Auth: `Authorization: Bearer ${CRON_SECRET}`.
  */
