@@ -1,14 +1,13 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, CalendarCheck, Cuboid, HardHat, Plug, ShieldCheck, Tent } from "lucide-react";
+import { ArrowRight, CalendarCheck, Check, Cuboid, HardHat, Plug, ShieldCheck, Tent } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppDemo } from "@/components/marketing/app-demo";
 import { MODULES, SOLUTIONS } from "@/components/marketing/content";
 import fotoEstructura from "@/assets/marketing/estructura-carpa.jpg";
-import fotoLuces from "@/assets/marketing/luces-cristal.jpg";
 import fotoMontaje from "@/assets/marketing/montaje-iluminacion.jpg";
-import { CheckList, ClientLogos, Container, FeatureRow, FinalCta, MiniVisual, SectionTitle } from "@/components/marketing/sections";
+import { ClientLogos, Container, FeatureRow, FinalCta, MiniVisual, SectionTitle } from "@/components/marketing/sections";
 
 export const metadata: Metadata = {
   title: { absolute: "Rentevent · Software para empresas de carpas y eventos" },
@@ -161,18 +160,27 @@ export default function HomePage() {
         </Container>
       </section>
 
-      <section className="relative isolate overflow-hidden border-y py-20">
-        <Image src={fotoLuces} alt="" aria-hidden placeholder="blur" fill sizes="100vw" className="-z-20 object-cover" />
-        <div className="absolute inset-0 -z-10 bg-background/65" aria-hidden />
+      <section className="bg-brand-600 py-20 text-white">
         <Container className="grid items-center gap-10 lg:grid-cols-2">
-          <div>
-            <SectionTitle eyebrow="Integraciones" title="Se conecta con lo que ya usas" intro="Pagos, calendario, correo, mensajería y tu asesoría contable. Y una API abierta para todo lo demás." />
-            <CheckList className="mt-6" items={["Webhooks para cada cambio de estado", "Importación desde CSV, Excel y otros programas de alquiler"]} />
+          <div className="max-w-2xl">
+            <p className="text-sm font-semibold text-white/80">Integraciones</p>
+            <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Se conecta con lo que ya usas</h2>
+            <p className="mt-4 text-lg text-white/85">Pagos, calendario, correo, mensajería y tu asesoría contable. Y una API abierta para todo lo demás.</p>
+            <ul className="mt-6 space-y-2.5">
+              {["Webhooks para cada cambio de estado", "Importación desde CSV, Excel y otros programas de alquiler"].map((t) => (
+                <li key={t} className="flex items-start gap-2.5 text-[15px]">
+                  <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-white/20">
+                    <Check className="size-3" strokeWidth={3} aria-hidden />
+                  </span>
+                  {t}
+                </li>
+              ))}
+            </ul>
           </div>
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {INTEGRATIONS.map((i) => (
-              <li key={i} className="flex h-20 flex-col items-center justify-center gap-1.5 rounded-2xl border bg-background/90 text-center shadow-sm text-sm font-medium">
-                <Plug className="size-4 text-muted-foreground" aria-hidden />
+              <li key={i} className="flex h-20 flex-col items-center justify-center gap-1.5 rounded-2xl bg-white text-center text-sm font-medium text-foreground shadow-sm">
+                <Plug className="size-4 text-brand-600" aria-hidden />
                 {i}
               </li>
             ))}

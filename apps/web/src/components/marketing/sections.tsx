@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { TentIllustration } from "./tent-illustration";
+import { TentDemo } from "./tent-demo";
 
 export function Container({ className, children }: { className?: string; children: React.ReactNode }) {
   return <div className={cn("mx-auto w-full max-w-7xl px-4 sm:px-6 [&>*]:min-w-0", className)}>{children}</div>;
@@ -82,14 +82,7 @@ export function FinalCta({ title = "Monta tu próxima carpa con Rentevent", text
 export function MiniVisual({ kind }: { kind: "bom" | "gantt" | "warehouse" | "quote" | "tent" | "finance" | "ai" | "availability" }) {
   const frame = "rounded-2xl border bg-canvas p-2 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.3)]";
   const inner = "rounded-xl border bg-background p-4";
-  if (kind === "tent")
-    return (
-      <div className={frame} aria-hidden>
-        <div className={cn(inner, "bg-gradient-to-b from-subtle to-background")}>
-          <TentIllustration modules={6} transparentBays={3} openRoofBays={1} className="w-full text-foreground" />
-        </div>
-      </div>
-    );
+  if (kind === "tent") return <TentDemo />;
   if (kind === "bom")
     return (
       <div className={frame} aria-hidden>

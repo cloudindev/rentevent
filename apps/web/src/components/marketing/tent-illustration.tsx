@@ -12,12 +12,18 @@ type Props = {
   className?: string;
   title?: string;
   showHuman?: boolean;
+  /** keep the framing of a tent this long, so the drawing does not rescale while modules change */
+  frameModules?: number;
+  /** outlines one element in the brand colour (used by the animated demo) */
+  highlight?: { type: "side"; bay: number } | { type: "roof"; bay: number } | null;
+  /** extra SVG drawn on top; receives the projection (x along length, y up, z across) */
+  overlay?: (project: (x: number, y: number, z: number) => [number, number]) => React.ReactNode;
 };
 
 const C = Math.cos(Math.PI / 6);
 const S = Math.sin(Math.PI / 6);
 
-export function TentIllustration({ modules, transparentBays = 0, openRoofBays = 0, width = 15, className, title = "Carpa en perspectiva", showHuman = true }: Props) {
+export function TentIllustration({ modules, transparentBays = 0, openRoofBays = 0, width = 15, className, title = "Carpa en perspectiva", showHuman = true, frameModules, highlight, overlay }: Props) {
   const m = 5;
   const L = modules * m;
   const hw = width / 2;
@@ -35,9 +41,10 @@ export function TentIllustration({ modules, transparentBays = 0, openRoofBays = 
   ];
 
   const minX = P(0, ridge, hw)[0] - 20;
-  const maxX = P(L + 3, ridge, -hw)[0] + 20;
+  const FL = Math.max(L, (frameModules ?? modules) * m);
+  const maxX = P(FL + 3, ridge, -hw)[0] + 20;
   const minY = P(0, ridge + 1.5, -hw)[1] - 10;
-  const maxY = P(L + 2, 0, hw + 2)[1] + 12;
+  const maxY = P(FL + 2, 0, hw + 2)[1] + 12;
 
   const bays = Array.from({ length: modules }, (_, i) => i);
   return (
@@ -103,6 +110,24 @@ export function TentIllustration({ modules, transparentBays = 0, openRoofBays = 
         const [x, y] = P(i * m + 0.2, 0, hw + 0.7);
         return <rect key={`w${i}`} x={x - 4} y={y - 6} width="8" height="6" rx="1" fill="#9a9a95" />;
       })}
+      {highlight?.type === "side" && highlight.bay < modules && (
+        <polygon
+          points={pts([[highlight.bay * m, 0, hw], [(highlight.bay + 1) * m, 0, hw], [(highlight.bay + 1) * m, eave, hw], [highlight.bay * m, eave, hw]])}
+          fill="#f95f40"
+          fillOpacity="0.12"
+          stroke="#f95f40"
+          strokeWidth="1.6"
+        />
+      )}
+      {highlight?.type === "roof" && highlight.bay < modules && (
+        <polygon
+          points={pts([[highlight.bay * m, ridge, 0], [(highlight.bay + 1) * m, ridge, 0], [(highlight.bay + 1) * m, eave, hw], [highlight.bay * m, eave, hw]])}
+          fill="#f95f40"
+          fillOpacity="0.12"
+          stroke="#f95f40"
+          strokeWidth="1.6"
+        />
+      )}
       {/* human for scale */}
       {showHuman && (() => {
         const [x, y] = P(L + 2, 0, hw + 1.5);
@@ -113,6 +138,7 @@ export function TentIllustration({ modules, transparentBays = 0, openRoofBays = 
           </g>
         );
       })()}
+      {overlay?.(P)}
     </svg>
   );
 }
