@@ -65,7 +65,7 @@ export function LinesTable({
       <table className="w-full min-w-[720px] text-sm">
         <thead className="bg-subtle">
           <tr className="border-b text-[13px] text-muted-foreground">
-            <th className="h-10 px-4 text-left font-normal">Artículo</th>
+            <th className="h-10 min-w-[260px] px-4 text-left font-normal">Artículo</th>
             <th className="w-24 px-2 text-right font-normal">Cant.</th>
             <th className="w-20 px-2 text-right font-normal">Libres</th>
             <th className="w-36 px-4 text-left font-normal">Disponibilidad</th>
@@ -104,7 +104,7 @@ export function LinesTable({
                           {isOpen ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
                         </button>
                         <Tent className="size-4 text-muted-foreground" strokeWidth={1.6} />
-                        <span className="font-medium">{tentLabel(l, catalogue)}</span>
+                        <span className="min-w-0 truncate font-medium" title={tentLabel(l, catalogue)}>{tentLabel(l, catalogue)}</span>
                         <span className="hidden whitespace-nowrap text-xs text-muted-foreground lg:inline">{bom ? `${formatNumber(bom.totals.superficie)} m² · ${bom.lines.length} piezas` : ""}</span>
                       </div>
                     </td>

@@ -30,3 +30,4 @@ Cada línea: decisión — motivo. Los valores marcados **[SUPUESTO]** son datos
 - Todas las carpas del catálogo se dibujan a dos aguas (petición del cliente) — la cubierta poligonal sigue soportada por el motor y el visor como opción de familia, y el test de aceptación 15x30 la cubre con una variante poligonal.
 - Familia 20 m alta con 20 módulos máximos (20x100) — necesario para el criterio de rendimiento; el stock real de C20A (20) limita a 20x95 y el configurador lo marca en rojo.
 - Solo los subalquileres confirmados o recibidos suman stock entrante — uno solicitado aún no está garantizado.
+- pg 8 encola las consultas lanzadas en paralelo dentro de una misma transacción (aviso de deprecación) — se mantiene pg 8.x fijado; al migrar a pg 9 hay que serializar los Promise.all dentro de withTenant.

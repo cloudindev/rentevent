@@ -12,7 +12,7 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   pageExtensions: ["ts", "tsx", "mdx"],
   transpilePackages: ["@rentevent/core", "@rentevent/db"],
-  serverExternalPackages: ["pg", "@react-pdf/renderer", "exceljs", "bullmq", "nodemailer", "web-push"],
+  serverExternalPackages: ["pg", "sharp", "@react-pdf/renderer", "exceljs", "bullmq", "nodemailer", "web-push"],
   typedRoutes: false,
   poweredByHeader: false,
   devIndicators: false,
