@@ -30,10 +30,7 @@ export default function HomePage() {
       <section className="overflow-hidden pb-16 pt-14 sm:pt-20">
         <Container className="grid items-center gap-12 lg:grid-cols-[1fr_1.15fr]">
           <div>
-            <p className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm text-muted-foreground">
-              <span className="size-1.5 rounded-full bg-brand-500" /> Para empresas de carpas y estructuras
-            </p>
-            <h1 className="mt-6 text-4xl font-bold leading-[1.05] tracking-tight sm:text-5xl lg:text-[3.5rem]">Software gestión eventos y producciones audiovisuales</h1>
+            <h1 className="text-4xl font-bold leading-[1.05] tracking-tight sm:text-5xl lg:text-[3.5rem]">Software gestión eventos y producciones audiovisuales</h1>
             <p className="mt-6 max-w-xl text-lg text-muted-foreground sm:text-xl">
               Presupuesta una 15x30 en dos minutos: despiece automático, cerchas disponibles en vivo y la carpa en 3D para tu cliente.
             </p>
