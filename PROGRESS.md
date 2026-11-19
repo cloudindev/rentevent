@@ -23,31 +23,33 @@ Servidor local: `pnpm dev` (puerto 3210 en este equipo; el 3000 está ocupado). 
 
 ## Fase 4 · Pedidos y proyectos
 - [x] Pantalla de pedido (disponibilidad en vivo, línea de tiempo, configurador, alternativas, estados, presupuestos versionados)
-- [ ] PDF del presupuesto + página pública con aceptación y firma
-- [ ] Proyectos (fases, pedidos, turnos, tareas, archivos, rentabilidad, duplicar)
-- [ ] Agenda (día/semana/mes)
-- [ ] Subalquileres
+- [x] PDF del presupuesto + página pública con aceptación y firma
+- [x] Proyectos (fases, pedidos, turnos, tareas, archivos, rentabilidad, duplicar)
+- [x] Agenda (día/semana/mes)
+- [x] Subalquileres
 
 ## Fase 5 · Recursos
 - [x] Personal, tablero, conflictos, fichaje, PWA del trabajador, transporte, espacios
 
 ## Fase 6 · Almacén y mantenimiento
-- [ ] Listas de carga, escaneo, retornos con daños, albaranes con firma, certificado
-- [ ] Mantenimiento (reparaciones, revisiones, limpieza)
+- [x] Listas de carga, escaneo, retornos con daños, albaranes con firma, certificado
+- [x] Mantenimiento (reparaciones, revisiones, limpieza)
 
 ## Fase 7 · Finanzas
 - [x] Ventas, compras, tesorería, dashboard, PDF y Verifactu preparado
-- [ ] Seed: huellas Verifactu reales con `verifactuHash`
+- [x] Seed: huellas Verifactu reales con `verifactuHash`
 
 ## Fase 8 · IA y otros
-- [ ] Asistente (adaptador + simulado), workflows, analytics, emails, comunicación
+- [x] Asistente (adaptador + simulado), workflows, analytics, emails, comunicación
 
 ## Fase 9 · SaaS
-- [ ] Onboarding, importadores CSV/Excel (Rentman), Stripe, API pública + webhooks, configuración, RGPD
+- [x] Onboarding, importadores CSV/Excel (Rentman), Stripe, API pública + webhooks, configuración, RGPD
 
 ## Fase 10 · Web pública
 - [x] Portada con demo animada, producto, soluciones, precios, clientes, blog MDX, contacto, legales, cookies
 
 ## Fase 11 · Cierre
-- [ ] Inicio (panel del día)
-- [ ] E2E Playwright, build, lint, README, despliegue (Supabase + Vercel)
+- [x] Inicio (panel del día)
+- [x] E2E Playwright (6/6), build de producción, lint sin errores, README
+- [x] Supabase (UE): migraciones, RLS y seed demo aplicados; aislamiento verificado a través del pooler de transacciones
+- [ ] Vercel: Root Directory `apps/web` y variables de entorno (lo configura el cliente en el panel de Vercel)
