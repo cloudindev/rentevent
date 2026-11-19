@@ -15,6 +15,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["pg", "@react-pdf/renderer", "exceljs", "bullmq", "nodemailer", "web-push"],
   typedRoutes: false,
   poweredByHeader: false,
+  devIndicators: false,
   images: { formats: ["image/avif", "image/webp"] },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
