@@ -6,7 +6,7 @@
  *   Demo login: demo@rentevent.es / Rentevent2026!
  */
 import "./env";
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
 import {
   computeBom,
@@ -442,7 +442,19 @@ async function createOrder(tx: Tx, ids: Ids, spec: OrderSpec) {
       version: 1,
       number: `${number}-1`,
       status: ["confirmado", "en_curso", "devuelto"].includes(spec.status) ? "aceptado" : spec.status === "cancelado" ? "rechazado" : "enviado",
-      snapshot: { totals, lines: pricedLines },
+      snapshot: {
+        rows: pricedLines.map((l) => ({ description: (l as { description?: string }).description ?? l.kind, quantity: l.quantity, unitPrice: l.unitPrice, priceMode: l.priceMode, discountPct: l.discountPct, kind: l.kind, taxRate: 21 })),
+        totals,
+        tents: [],
+        terms: "Precios sin IVA. Incluye montaje y desmontaje en horario laborable.",
+        days,
+        imageKey: null,
+        title: spec.title,
+        eventStart: spec.eventStart.toISOString(),
+        eventEnd: spec.eventEnd.toISOString(),
+        periodStart: spec.load.toISOString(),
+        periodEnd: spec.ret.toISOString(),
+      },
       total: totals.total,
       validUntil: new Date(Date.now() + 30 * D).toISOString().slice(0, 10),
       publicToken: randomBytes(16).toString("base64url"),
@@ -643,7 +655,9 @@ async function seedProjects(tx: Tx, ids: Ids) {
           requiredSkills: skills,
           estimatedHours: hours * people,
           vehicleId: phase === "carga" ? null : ids.vehicles[bi % 2]!,
-          address: job.project.locationAddress ?? job.spec.venue,
+          address: (await tx.select().from(s.venues).where(eq(s.venues.id, ids.venues[job.spec.venue]!)))[0]?.address ?? null,
+          lat: (await tx.select().from(s.venues).where(eq(s.venues.id, ids.venues[job.spec.venue]!)))[0]?.lat ?? null,
+          lng: (await tx.select().from(s.venues).where(eq(s.venues.id, ids.venues[job.spec.venue]!)))[0]?.lng ?? null,
           published: true,
           checklist: phase === "montaje" ? ["Replanteo y nivelación", "Montaje de pórticos", "Lonas de techo", "Laterales y frentes", "Lastre o anclajes revisados", "Fotos finales"] : ["Revisión de material", "Fotos"],
         })
@@ -710,14 +724,20 @@ async function seedFinance(tx: Tx, ids: Ids) {
       const vat = Math.round(base * 0.21 * 100) / 100;
       const issue = `${year}-${String(m).padStart(2, "0")}-${String(5 + k * 8).padStart(2, "0")}`;
       const clientKey = ["ayto", "festival", "hotel", "bodas", "feria", "club"][(i + k) % 6]!;
-      const hash = Buffer.from(`${issue}|F${n}|${base + vat}|${prevHash ?? ""}`).toString("base64").slice(0, 44);
+      const fullNumber = `F${year}-${String(n).padStart(4, "0")}`;
+      // same payload as verifactuHash() in apps/web/src/server/finance/hash.ts
+      const [iy, im, id] = issue.split("-");
+      const hash = createHash("sha256")
+        .update([`IDEmisorFactura=B33000000`, `NumSerieFactura=${fullNumber}`, `FechaExpedicionFactura=${id}-${im}-${iy}`, `TipoFactura=F1`, `ImporteTotal=${(base + vat).toFixed(2)}`, `Huella=${prevHash ?? ""}`].join("&"), "utf8")
+        .digest("hex")
+        .toUpperCase();
       const paid = m < 11 || k === 0;
       const [inv] = await tx
         .insert(s.invoices)
         .values({
           seriesId: series!.id,
           number: n,
-          fullNumber: `F${year}-${String(n).padStart(4, "0")}`,
+          fullNumber,
           status: paid ? "cobrada" : m === 11 && k === 2 ? "vencida" : "emitida",
           clientId: ids.contacts[clientKey]!,
           issueDate: issue,
