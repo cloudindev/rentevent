@@ -13,7 +13,7 @@ export type ItemFormValues = {
   sku: string;
   name: string;
   category: string;
-  kind: "granel" | "seriado" | "consumible";
+  kind: "granel" | "seriado" | "consumible" | "servicio";
   unit: "ud" | "m2" | "m" | "ml" | "rollo" | "kg";
   role: PartRole;
   roleAmount: number;
@@ -75,6 +75,7 @@ export function ItemSheet({ open, onOpenChange, initial }: { open: boolean; onOp
             <option value="granel">A granel (por cantidad)</option>
             <option value="seriado">Seriado (QR por unidad)</option>
             <option value="consumible">Consumible</option>
+            <option value="servicio">Servicio (sin control de stock)</option>
           </NativeSelect>
         </Field>
         <Field label="Unidad" htmlFor="it-unit">

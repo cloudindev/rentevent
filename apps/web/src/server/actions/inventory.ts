@@ -11,7 +11,7 @@ const itemInput = z.object({
   sku: z.string().trim().min(1, "Obligatorio").max(40),
   name: z.string().trim().min(2, "Obligatorio").max(120),
   category: z.string().trim().min(1).max(60),
-  kind: z.enum(["granel", "seriado", "consumible"]),
+  kind: z.enum(["granel", "seriado", "consumible", "servicio"]),
   unit: z.enum(["ud", "m2", "m", "ml", "rollo", "kg"]),
   role: z.enum(PART_ROLES),
   roleAmount: z.coerce.number().positive().default(1),

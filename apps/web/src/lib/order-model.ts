@@ -43,7 +43,10 @@ export type PricedRow = PricedLineInput & { description: string; lineKey: string
 /** Expands work lines into material requirements (by item). */
 export function materialOf(lines: WorkLine[], cat: Catalogue) {
   const req = new Map<string, number>();
-  const add = (id: string, q: number) => req.set(id, Math.round(((req.get(id) ?? 0) + q) * 100) / 100);
+  const untracked = new Set(cat.items.filter((i) => i.kind === "servicio").map((i) => i.id));
+  const add = (id: string, q: number) => {
+    if (!untracked.has(id)) req.set(id, Math.round(((req.get(id) ?? 0) + q) * 100) / 100);
+  };
   const boms = new Map<string, ReturnType<typeof computeCompositionBom>>();
   for (const l of lines) {
     if (l.kind === "carpa") {

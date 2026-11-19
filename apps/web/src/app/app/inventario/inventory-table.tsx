@@ -31,7 +31,7 @@ export type InventoryRow = {
   pending: boolean;
 };
 
-const KIND_LABEL: Record<string, string> = { granel: "A granel", seriado: "Seriado", consumible: "Consumible" };
+const KIND_LABEL: Record<string, string> = { granel: "A granel", seriado: "Seriado", consumible: "Consumible", servicio: "Servicio" };
 
 export function InventoryTable({ rows, views, canEdit, openNew }: { rows: InventoryRow[]; views: SavedView[]; canEdit: boolean; openNew: boolean }) {
   const router = useRouter();

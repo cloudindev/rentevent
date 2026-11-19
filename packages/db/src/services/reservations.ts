@@ -6,7 +6,7 @@
  * under per-item row locks so two sales people can never confirm the same
  * trusses twice.
  */
-import { and, eq, gt, inArray, isNotNull, lt, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNotNull, lt, ne, sql } from "drizzle-orm";
 import {
   checkLines,
   computeAvailability,
@@ -108,7 +108,8 @@ export async function orderMaterial(tx: Tx, orderId: string): Promise<{ itemId: 
   const rows = await tx
     .select({ itemId: orderLines.itemId, quantity: orderLines.quantity, kind: orderLines.kind })
     .from(orderLines)
-    .where(and(eq(orderLines.orderId, orderId), isNotNull(orderLines.itemId)));
+    .innerJoin(items, eq(items.id, orderLines.itemId))
+    .where(and(eq(orderLines.orderId, orderId), isNotNull(orderLines.itemId), ne(items.kind, "servicio")));
   const sum = new Map<string, number>();
   for (const r of rows) {
     if (!r.itemId || r.kind === "suplemento") continue;

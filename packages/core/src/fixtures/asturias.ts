@@ -12,7 +12,7 @@ import type { VehicleType } from "../tent/bom";
 export type FixtureItem = BomItem & {
   category: string;
   stock: number;
-  kind: "granel" | "seriado" | "consumible";
+  kind: "granel" | "seriado" | "consumible" | "servicio";
   price: number;
   priceMode: "unidad" | "dia" | "periodo" | "m2" | "incluido";
   /** units of the role covered by one unit (e.g. a 2 m² stage deck) */
@@ -114,7 +114,7 @@ const SAT = {
   foco: add({ id: "item-foco", sku: "FOC-LED", name: "Foco LED 100 W", unit: "ud", weightKg: 2, volumeM3: 0.01, role: "otro", category: "Iluminación", stock: 200, kind: "seriado", price: 8, priceMode: "unidad", ...P }),
   calefactor: add({ id: "item-calefactor", sku: "CAL-30", name: "Calefactor de gasoil 30 kW", unit: "ud", weightKg: 35, volumeM3: 0.3, role: "otro", category: "Climatización", stock: 16, kind: "seriado", price: 90, priceMode: "dia", ...P }),
   extintor: add({ id: "item-extintor", sku: "EXT-6", name: "Extintor 6 kg", unit: "ud", weightKg: 10, volumeM3: 0.02, role: "otro", category: "Seguridad", stock: 60, kind: "seriado", price: 5, priceMode: "unidad", ...P }),
-  certificado: add({ id: "item-certificado", sku: "CERT", name: "Certificado de instalación", unit: "ud", weightKg: 0, volumeM3: 0, role: "otro", category: "Servicios", stock: 0, kind: "consumible", price: 120, priceMode: "unidad" }),
+  certificado: add({ id: "item-certificado", sku: "CERT", name: "Certificado de instalación", unit: "ud", weightKg: 0, volumeM3: 0, role: "otro", category: "Servicios", stock: 0, kind: "servicio", price: 120, priceMode: "unidad" }),
 };
 
 type FamDef = {
