@@ -33,7 +33,7 @@ function download(blob: Blob, name: string) {
 }
 
 export function VisorClient({ families, items, rules, vehicles }: Props) {
-  const first = families.find((f) => f.roofShape !== "jaima") ?? families[0]!;
+  const first = families.find((f) => f.width === 10 && f.roofShape !== "jaima") ?? families.find((f) => f.roofShape !== "jaima") ?? families[0]!;
   const [composition, setComposition] = useState<Composition>(() => ({
     version: 1,
     tents: [{ id: "t1", label: first.name, config: defaultConfiguration(first, 4), placement: { x: 0, y: 0, rotation: 0 } }],
@@ -41,17 +41,11 @@ export function VisorClient({ families, items, rules, vehicles }: Props) {
     site: null,
   }));
   const [selected, setSelected] = useState<string>("t1");
-  const [ms, setMs] = useState<number | null>(null);
   const api = useRef<TentViewerApi>(null);
   const famById = useMemo(() => new Map(families.map((f) => [f.id, f])), [families]);
   const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
 
-  const bom = useMemo(() => {
-    const t0 = performance.now();
-    const r = computeCompositionBom({ composition, families, rules, items, vehicles });
-    setTimeout(() => setMs(Math.round(performance.now() - t0)), 0);
-    return r;
-  }, [composition, families, rules, items, vehicles]);
+  const bom = useMemo(() => computeCompositionBom({ composition, families, rules, items, vehicles }), [composition, families, rules, items, vehicles]);
 
   const tent = composition.tents.find((t) => t.id === selected) ?? composition.tents[0]!;
   const fam = famById.get(tent.config.familyId)!;
@@ -169,7 +163,7 @@ export function VisorClient({ families, items, rules, vehicles }: Props) {
           </TabsContent>
         </Tabs>
         <p className="text-xs text-muted-foreground">
-          Haz clic en una lona de techo, un lateral o un frente para cambiar su tipo. El despiece se recalcula al instante{ms !== null ? ` (${ms} ms)` : ""}.
+          Haz clic en una lona de techo, un lateral o un frente para cambiar su tipo. El despiece, el peso y las horas se recalculan al instante.
         </p>
       </div>
 
