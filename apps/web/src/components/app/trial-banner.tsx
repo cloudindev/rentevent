@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { now } from "@/lib/now";
 
 export function TrialBanner({ status, trialEndsAt }: { status: string; trialEndsAt: string | null }) {
   if (status === "active") return null;
-  const days = trialEndsAt ? Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86_400_000) : null;
+  const days = trialEndsAt ? Math.ceil((new Date(trialEndsAt).getTime() - now()) / 86_400_000) : null;
   if (status === "trialing" && days !== null && days > 7) return null;
   const expired = status === "past_due" || status === "canceled" || (days !== null && days <= 0);
   return (

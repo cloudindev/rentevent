@@ -5,13 +5,16 @@ import type { PricedRow } from "@/lib/order-model";
 import type { OrderWorkspaceData } from "@/server/orders";
 import { formatEUR } from "@/lib/utils";
 
-export function TotalsPanel({ totals, rows, showMargin, shortTotal, order, days }: { totals: QuoteTotals; rows: PricedRow[]; showMargin: boolean; shortTotal: number; order: OrderWorkspaceData["order"]; days: number }) {
-  const Row = ({ k, v, strong }: { k: string; v: string; strong?: boolean }) => (
+function Row({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
+  return (
     <div className={`flex justify-between ${strong ? "text-base font-semibold" : ""}`}>
       <dt className={strong ? "" : "text-muted-foreground"}>{k}</dt>
       <dd className="tabular">{v}</dd>
     </div>
-  );
+    );
+}
+
+export function TotalsPanel({ totals, rows, showMargin, shortTotal, order, days }: { totals: QuoteTotals; rows: PricedRow[]; showMargin: boolean; shortTotal: number; order: OrderWorkspaceData["order"]; days: number }) {
   return (
     <section className="rounded-xl border bg-card p-4" aria-label="Totales">
       <h3 className="mb-3 text-sm font-semibold">Precio</h3>

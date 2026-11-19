@@ -33,7 +33,9 @@ export function OrderWorkspace({ data, perms }: { data: OrderWorkspaceData; perm
   const savedLines = useRef(JSON.stringify(data.lines));
   const ownSavedAt = useRef<string | null>(null);
   const latest = useRef(lines);
-  latest.current = lines;
+  useEffect(() => {
+    latest.current = lines;
+  }, [lines]);
   const editable = perms.edit && !["devuelto", "cancelado"].includes(order.status);
 
   // server data refreshed (router.refresh) → adopt it if we have no local edits

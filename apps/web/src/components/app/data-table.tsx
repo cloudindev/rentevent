@@ -30,7 +30,11 @@ export function EditableCell({ value, onSave, type = "text", align = "left", dis
   const [editing, setEditing] = useState(false);
   const [v, setV] = useState(String(value));
   const [pending, start] = useTransition();
-  useEffect(() => setV(String(value)), [value]);
+  const [prev, setPrev] = useState(value);
+  if (prev !== value) {
+    setPrev(value);
+    setV(String(value));
+  }
   if (disabled) return <span className={cn(align === "right" && "tabular block text-right")}>{value}</span>;
   if (!editing)
     return (
@@ -113,6 +117,7 @@ export function DataTable<T>({
   useEffect(() => {
     try {
       const raw = localStorage.getItem(`rv.cols.${entity}`);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration-safe read of a per-viewer preference
       if (raw) setVisibility(JSON.parse(raw));
     } catch {
       /* storage unavailable */

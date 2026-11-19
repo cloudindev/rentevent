@@ -8,25 +8,24 @@ import {
   eq,
   inArray,
   items,
-  orderLines,
   orders,
   projectPhases,
   projects,
   quotes,
   subrentals,
-  tentConfigurations,
   tentTemplates,
   venues,
   type Tx,
 } from "@rentevent/db";
 import { AvailabilityConflictError, availableMap, checkOrderAvailability, reserveOrder, syncReservations } from "@rentevent/db/services";
-import { addDays, compositionSchema, dayKey, defaultConfiguration, quoteTotals, shortagesFor, validateConfiguration } from "@rentevent/core";
-import { materialOf, orderTotals, pricedRows, tentLabel, type WorkLine } from "@/lib/order-model";
+import { addDays, compositionSchema, dayKey, defaultConfiguration, quoteTotals, shortagesFor } from "@rentevent/core";
+import { materialOf, orderTotals, tentLabel, type WorkLine } from "@/lib/order-model";
 import { audit } from "../audit";
 import { tenantAction, UserError } from "../action";
 import { nextCounter } from "../numbering";
 import { loadCatalogue, tenantPricing } from "../orders";
 import { persistLines } from "../order-persist";
+import { emitEvent } from "../events";
 import { buildTimeline } from "../timeline";
 import { putObject } from "@/lib/adapters/storage";
 import { emailLayout, escapeHtml, sendEmail } from "@/lib/adapters/email";
@@ -40,8 +39,6 @@ const workLine = z.discriminatedUnion("kind", [
   z.object({ key: z.string(), kind: z.literal("kit"), kitId: z.string().uuid(), description: z.string().max(200), quantity: z.number().min(0).max(1e5), unitPrice: z.number().min(0), discountPct: z.number().min(0).max(100) }),
   z.object({ key: z.string(), kind: z.enum(["servicio", "transporte", "mano_obra", "texto"]), description: z.string().max(500), quantity: z.number().min(0).max(1e6), unitPrice: z.number().min(-1e7).max(1e7), priceMode, discountPct: z.number().min(0).max(100), unitCost: z.number().min(0) }),
 ]);
-
-const PHASES = ["carga", "transporte", "montaje", "evento", "desmontaje", "retorno"] as const;
 
 function phaseTimes(load: Date, eventStart: Date, eventEnd: Date, ret: Date) {
   const H = 3_600_000;
@@ -121,6 +118,7 @@ export const createOrder = tenantAction(createInput, "comercial", async (input, 
   if (composition) await persistLines(tx, o!.id, [{ key: "new", kind: "carpa", tentConfigId: null, label: "", composition, unitPrice: null, discountPct: 0 }]);
   await audit(tx, ctx, "order", o!.id, "crear", { numero: number });
   await syncProjectStatus(tx, projectId);
+  emitEvent(ctx.tenantId, "order.created", { id: o!.id, number, title: input.title });
   revalidatePath("/app/pedidos");
   return { id: o!.id };
 });
@@ -220,6 +218,7 @@ export const changeOrderStatus = tenantAction(
     }
     await syncProjectStatus(tx, o.projectId);
     await audit(tx, ctx, "order", orderId, status === "confirmado" ? "confirmar" : status === "cancelado" ? "cancelar" : "estado", { de: o.status, a: status });
+    emitEvent(ctx.tenantId, status === "confirmado" ? "order.confirmed" : status === "cancelado" ? "order.cancelled" : "order.updated", { id: orderId, number: o.number, title: o.title, from: o.status, status });
     revalidatePath(`/app/pedidos/${orderId}`);
     revalidatePath("/app/pedidos");
     return { status, shortages: [] };
@@ -352,6 +351,7 @@ export const sendQuote = tenantAction(
     const { emails } = await import("@rentevent/db");
     await tx.insert(emails).values({ direction: "saliente", fromAddress: ctx.user.email, toAddress: to, subject: `Presupuesto ${q.number}`, body: `${message}\n\n${url}`, entity: "order", entityId: q.orderId, read: true });
     await audit(tx, ctx, "quote", quoteId, "enviar", { to });
+    emitEvent(ctx.tenantId, "quote.sent", { id: quoteId, number: q.number, orderId: q.orderId });
     revalidatePath(`/app/pedidos/${q.orderId}`);
     return { url };
   },

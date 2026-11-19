@@ -48,7 +48,7 @@ export function TentConfigurator({
   marginMinutes,
   editable,
   onChange,
-  onReplace,
+  onReplace: _onReplace,
   allLines,
   apiRef,
 }: {

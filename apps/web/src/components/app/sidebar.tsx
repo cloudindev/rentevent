@@ -34,6 +34,7 @@ export function Sidebar({ user, tenant, memberships }: { user: ShellUser; tenant
 
   useEffect(() => {
     try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration-safe read of a per-viewer preference
       setCollapsed(localStorage.getItem("rv.sidebar") === "1");
     } catch {
       /* storage unavailable */

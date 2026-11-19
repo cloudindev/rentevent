@@ -13,6 +13,7 @@ import { formatDate, formatDateTime, formatEUR, formatNumber } from "@/lib/utils
 import { tenantDb } from "@/server/context";
 import { buildTimeline } from "@/server/timeline";
 import { ItemActions } from "./item-actions";
+import { now } from "@/lib/now";
 
 const UNIT_TONE = { disponible: "success", en_obra: "info", reparacion: "warning", limpieza: "warning", baja: "neutral" } as const;
 const MOVE_LABEL: Record<string, string> = { salida: "Salida", retorno: "Retorno", dano: "Daño", perdida: "Pérdida", ajuste: "Ajuste", reparacion_alta: "A reparación", reparacion_baja: "Reparado" };
@@ -22,7 +23,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
   const data = await tenantDb(async (tx, ctx) => {
     const [item] = await tx.select().from(items).where(eq(items.id, id));
     if (!item) return null;
-    const today = dayKey(Date.now());
+    const today = dayKey(now());
     const [units, moves, reps, insps, timeline] = await Promise.all([
       tx.select().from(itemUnits).where(eq(itemUnits.itemId, id)).orderBy(asc(itemUnits.serial)),
       tx.select().from(movements).where(eq(movements.itemId, id)).orderBy(desc(movements.createdAt)).limit(30),

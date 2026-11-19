@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Logo } from "@/components/brand";
 
 export function AuthSplit({ children, aside, logo }: { children: React.ReactNode; aside?: React.ReactNode; logo?: React.ReactNode }) {
@@ -8,7 +9,7 @@ export function AuthSplit({ children, aside, logo }: { children: React.ReactNode
         <div className="flex flex-1 items-center justify-center py-10">
           <div className="w-full max-w-sm">{children}</div>
         </div>
-        <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} Rentevent · <a className="hover:underline" href="/legal/privacidad">Privacidad</a> · <a className="hover:underline" href="/legal/terminos">Términos</a></p>
+        <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} Rentevent · <Link className="hover:underline" href="/legal/privacidad">Privacidad</Link> · <Link className="hover:underline" href="/legal/terminos">Términos</Link></p>
       </div>
       <div className="relative hidden overflow-hidden bg-ink lg:block">{aside ?? <DefaultAside />}</div>
     </div>

@@ -5,6 +5,7 @@ import { eq, orders, quotes, withTenant } from "@rentevent/db";
 import { AvailabilityConflictError, reserveOrder } from "@rentevent/db/services";
 import { findQuoteByToken } from "@/server/public-quote";
 import { audit } from "@/server/audit";
+import { emitEvent } from "@/server/events";
 
 const input = z.object({ token: z.string(), name: z.string().trim().min(3, "Escribe tu nombre completo").max(120), signature: z.string().startsWith("data:image/png;base64,").max(400_000), accept: z.literal(true) });
 
@@ -31,6 +32,8 @@ export async function acceptQuote(raw: z.input<typeof input>): Promise<{ ok: boo
       if (!(e instanceof AvailabilityConflictError)) throw e;
       await tx.update(orders).set({ notes: `Aceptado por el cliente el ${new Date().toLocaleString("es-ES", { timeZone: "Europe/Madrid" })}, pero falta material: revisar antes de confirmar.` }).where(eq(orders.id, row.orderId));
     }
+    emitEvent(q.tenantId, "quote.accepted", { id: q.id, orderId: row.orderId, signer: parsed.data.name, confirmed });
+    if (confirmed) emitEvent(q.tenantId, "order.confirmed", { id: row.orderId, via: "aceptacion_cliente" });
     return { ok: true, confirmed };
   });
 }

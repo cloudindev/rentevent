@@ -12,6 +12,7 @@ import { can } from "@/lib/permissions";
 import { formatDate, formatEUR, formatTime } from "@/lib/utils";
 import { tenantDb } from "@/server/context";
 import { weeklyOccupancy } from "@/server/occupancy";
+import { now } from "@/lib/now";
 
 export const metadata = { title: "Inicio" };
 
@@ -26,7 +27,7 @@ function heat(pct: number) {
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ denegado?: string }> }) {
   const sp = await searchParams;
   const d = await tenantDb(async (tx, ctx) => {
-    const today = dayKey(Date.now());
+    const today = dayKey(now());
     const [y, m, dd] = parseDayKey(today);
     const t0 = new Date(zonedTime(y, m, dd));
     const [y2, m2, d2] = parseDayKey(addDays(today, 2));
@@ -55,7 +56,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     const understaffed = sh.filter((s) => Number(s.have) < s.need);
 
     const pending = await tx.select().from(orders).where(inArray(orders.status, ["consulta", "opcion", "borrador"])).orderBy(asc(orders.periodStart)).limit(8);
-    const expiring = pending.filter((o) => o.status === "opcion" && o.optionExpiresAt && o.optionExpiresAt.getTime() < Date.now() + 3 * 86_400_000);
+    const expiring = pending.filter((o) => o.status === "opcion" && o.optionExpiresAt && o.optionExpiresAt.getTime() < now() + 3 * 86_400_000);
     const sentQuotes = await tx.select({ c: count() }).from(quotes).where(eq(quotes.status, "enviado"));
 
     const [billing] = await tx.select({ total: sql<number>`coalesce(sum(${invoices.subtotal}),0)::float`, n: count() }).from(invoices).where(and(gte(invoices.issueDate, monthStart), lte(invoices.issueDate, today), inArray(invoices.status, ["emitida", "cobrada", "vencida"])));
@@ -68,7 +69,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   });
   const { ctx } = d;
   const hello = new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", weekday: "long", day: "numeric", month: "long" }).format(new Date());
-  const todayKey = dayKey(Date.now());
+  const todayKey = dayKey(now());
   const kpis = [
     { label: "Montajes y desmontajes (48 h)", value: d.phases.filter((p) => p.kind === "montaje" || p.kind === "desmontaje").length, icon: CalendarClock, href: "/app/agenda?vista=semana", tone: "neutral" as const },
     { label: "Conflictos de material (30 d)", value: d.conflicts.length, icon: AlertTriangle, href: "#conflictos", tone: d.conflicts.length ? ("danger" as const) : ("success" as const) },

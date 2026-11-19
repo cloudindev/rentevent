@@ -4,6 +4,7 @@ import { PageBody, PageHeader } from "@/components/app/page-header";
 import { can } from "@/lib/permissions";
 import { tenantDb } from "@/server/context";
 import { SubrentalsBoard } from "./board";
+import { now } from "@/lib/now";
 
 export const metadata = { title: "Subalquileres" };
 
@@ -19,7 +20,7 @@ export default async function SubrentalsPage() {
       .orderBy(desc(subrentals.startsAt)),
     suppliers: await tx.select({ id: contacts.id, name: contacts.name }).from(contacts).where(eq(contacts.kind, "proveedor")).orderBy(asc(contacts.name)),
     items: await tx.select({ id: items.id, name: items.name }).from(items).where(eq(items.active, true)).orderBy(asc(items.name)),
-    orders: await tx.select({ id: orders.id, number: orders.number, title: orders.title, s: orders.periodStart, e: orders.periodEnd }).from(orders).where(gt(orders.periodEnd, new Date(Date.now() - 30 * 86_400_000))).orderBy(asc(orders.periodStart)),
+    orders: await tx.select({ id: orders.id, number: orders.number, title: orders.title, s: orders.periodStart, e: orders.periodEnd }).from(orders).where(gt(orders.periodEnd, new Date(now() - 30 * 86_400_000))).orderBy(asc(orders.periodStart)),
     role: ctx.role,
   }));
   return (

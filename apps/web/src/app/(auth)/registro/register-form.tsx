@@ -17,15 +17,12 @@ export function RegisterForm({ rootDomain, devOutbox }: { rootDomain: string; de
   const [pending, start] = useTransition();
 
   useEffect(() => {
-    if (!slugTouched) setForm((f) => ({ ...f, slug: f.company }));
-  }, [form.company, slugTouched]);
-  useEffect(() => {
-    if (form.slug.trim().length < 3) return setSlugState(null);
-    const t = setTimeout(async () => setSlugState(await checkSlug(form.slug)), 250);
+    const t = setTimeout(async () => setSlugState(form.slug.trim().length < 3 ? null : await checkSlug(form.slug)), 250);
     return () => clearTimeout(t);
   }, [form.slug]);
 
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((f) => ({ ...f, [k]: e.target.value, ...(k === "company" && !slugTouched ? { slug: e.target.value } : {}) }));
 
   if (done)
     return (

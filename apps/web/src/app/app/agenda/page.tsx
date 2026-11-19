@@ -8,6 +8,7 @@ import { STATUS_COLOR, ORDER_STATUS } from "@/components/app/order-status";
 import { tenantDb } from "@/server/context";
 import { cn } from "@/lib/utils";
 import { AgendaViews, type AgendaEvent } from "./views";
+import { now } from "@/lib/now";
 
 export const metadata = { title: "Agenda" };
 
@@ -38,7 +39,7 @@ function shiftAnchor(view: View, anchor: string, dir: -1 | 1) {
 export default async function AgendaPage({ searchParams }: { searchParams: Promise<{ vista?: string; fecha?: string; tipos?: string }> }) {
   const sp = await searchParams;
   const view: View = sp.vista === "dia" || sp.vista === "semana" ? sp.vista : "mes";
-  const anchor = /^\d{4}-\d{2}-\d{2}$/.test(sp.fecha ?? "") ? sp.fecha! : dayKey(Date.now());
+  const anchor = /^\d{4}-\d{2}-\d{2}$/.test(sp.fecha ?? "") ? sp.fecha! : dayKey(now());
   const types = new Set((sp.tipos ?? "pedidos,fases,turnos,transporte").split(","));
   const { from, to } = rangeFor(view, anchor);
   const [fy, fm, fd] = parseDayKey(from);
@@ -79,7 +80,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
       <PageHeader icon={CalendarDays} title="Agenda" subtitle={view === "semana" ? `Semana del ${title}` : title}>
         <div className="flex items-center gap-1">
           <Button asChild size="icon-sm" variant="outline"><Link href={q({ fecha: shiftAnchor(view, anchor, -1) })} aria-label="Anterior"><ChevronLeft /></Link></Button>
-          <Button asChild size="sm" variant="outline"><Link href={q({ fecha: dayKey(Date.now()) })}>Hoy</Link></Button>
+          <Button asChild size="sm" variant="outline"><Link href={q({ fecha: dayKey(now()) })}>Hoy</Link></Button>
           <Button asChild size="icon-sm" variant="outline"><Link href={q({ fecha: shiftAnchor(view, anchor, 1) })} aria-label="Siguiente"><ChevronRight /></Link></Button>
         </div>
         <div className="flex rounded-lg border p-0.5">
@@ -108,7 +109,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
           ))}
         </span>
       </div>
-      <AgendaViews view={view} days={dayCells(from, to).map((d) => ({ day: d.day, start: d.start, end: d.end }))} anchorMonth={anchor.slice(0, 7)} events={events} today={dayKey(Date.now())} dayHref={(d) => q({ vista: "dia", fecha: d })} />
+      <AgendaViews view={view} days={dayCells(from, to).map((d) => ({ day: d.day, start: d.start, end: d.end }))} anchorMonth={anchor.slice(0, 7)} events={events} today={dayKey(now())} dayHref={(d) => q({ vista: "dia", fecha: d })} />
     </>
   );
 }

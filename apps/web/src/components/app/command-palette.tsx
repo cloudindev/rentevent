@@ -40,10 +40,7 @@ export function CommandPaletteProvider({ role, children }: { role: string; child
   }, []);
 
   useEffect(() => {
-    if (q.trim().length < 2) {
-      setHits([]);
-      return;
-    }
+    if (q.trim().length < 2) return;
     const t = setTimeout(() => start(async () => setHits(await globalSearch(q))), 180);
     return () => clearTimeout(t);
   }, [q]);
@@ -72,7 +69,7 @@ export function CommandPaletteProvider({ role, children }: { role: string; child
               </div>
               <Command.List className="max-h-[50vh] overflow-y-auto p-2 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-muted-foreground">
                 <Command.Empty className="px-3 py-6 text-center text-sm text-muted-foreground">Sin resultados</Command.Empty>
-                {hits.length > 0 && (
+                {q.trim().length >= 2 && hits.length > 0 && (
                   <Command.Group heading="Resultados">
                     {hits.map((h) => {
                       const I = HIT_ICON[h.type];
