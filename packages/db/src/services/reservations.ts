@@ -6,7 +6,7 @@
  * under per-item row locks so two sales people can never confirm the same
  * trusses twice.
  */
-import { and, eq, gt, inArray, isNotNull, lt, ne, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import {
   checkLines,
   computeAvailability,
@@ -83,7 +83,7 @@ export async function loadAvailabilityInputs(tx: Tx, itemIds: string[], range: {
     tx
       .select()
       .from(subrentals)
-      .where(and(inArray(subrentals.itemId, ids), lt(subrentals.startsAt, range.end), gt(subrentals.endsAt, range.start), ne(subrentals.status, "devuelto"), ne(subrentals.status, "cancelado"))),
+      .where(and(inArray(subrentals.itemId, ids), lt(subrentals.startsAt, range.end), gt(subrentals.endsAt, range.start), inArray(subrentals.status, ["confirmado", "recibido"]))),
   ]);
   return {
     stocks: new Map(stockRows.map((s) => [s.id, { itemId: s.id, total: Number(s.total), inRepair: Number(s.repair) }])),

@@ -101,7 +101,7 @@ export function AppDemo() {
             <div className="space-y-2.5 p-3">
               <div className="flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[11px] text-muted-foreground">
                 <Search className="size-3" />
-                <span className="truncate">{step === 0 ? "Añadir carpas, artículos, kits o servicios…" : `Carpa 15x${modules * 5} poligonal · pesos · 3 tramos transparentes`}</span>
+                <span className="truncate">{step === 0 ? "Añadir carpas, artículos, kits o servicios…" : `Carpa 15x${modules * 5} a dos aguas · pesos · 3 tramos transparentes`}</span>
               </div>
               <div className="grid gap-2.5 lg:grid-cols-[minmax(0,1fr)_170px]">
                 <div className="overflow-hidden rounded-lg border">

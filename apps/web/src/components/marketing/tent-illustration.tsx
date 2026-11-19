@@ -30,9 +30,7 @@ export function TentIllustration({ modules, transparentBays = 0, openRoofBays = 
 
   const profile: [number, number][] = [
     [-hw, eave],
-    [-hw * 0.6, eave + (ridge - eave) * 0.7],
     [0, ridge],
-    [hw * 0.6, eave + (ridge - eave) * 0.7],
     [hw, eave],
   ];
 

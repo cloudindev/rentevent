@@ -15,14 +15,19 @@ import { computeVariables, variableNamesFor } from "./variables";
 import { coverPartsWithBom, generateTentParts, pointsAlong, roofProfile } from "../geometry/tent";
 import { validateFormula } from "../expr";
 
-const fam = (id: string) => fixtureFamilies.find((f) => f.id === id)!;
+const fam = (id: string) => {
+  const f = fixtureFamilies.find((x) => x.id === id)!;
+  // the acceptance criterion asks for a polygonal 15 m tent: keep that variant covered
+  return id === "fam-15b-pol" ? { ...fixtureFamilies.find((x) => x.id === "fam-15b")!, id, roofShape: "poligonal" as const } : f;
+};
 const qty = (lines: { itemId: string; quantity: number }[], itemId: string) => lines.find((l) => l.itemId === itemId)?.quantity ?? 0;
+const testRules = [...fixtureRules, ...fixtureRules.filter((r) => r.familyId === "fam-15b").map((r) => ({ ...r, id: `${r.id}-pol`, familyId: "fam-15b-pol" }))];
 const bom = (config: TentConfiguration) =>
-  computeBom({ config, family: fam(config.familyId), rules: fixtureRules, items: fixtureItems, vehicles: fixtureVehicles });
+  computeBom({ config, family: fam(config.familyId), rules: testRules, items: fixtureItems, vehicles: fixtureVehicles });
 
 /** Acceptance: 15x30 polygonal with weights, two complete fronts, transparent sides in three bays, last bay without roof. */
 function acceptanceConfig(): TentConfiguration {
-  let c = defaultConfiguration(fam("fam-15b"), 6);
+  let c = defaultConfiguration(fam("fam-15b-pol"), 6);
   c = { ...c, anchoring: "pesos" };
   c.bays = c.bays.map((b, i) => ({
     roof: i === 5 ? "ninguno" : "blanco",
@@ -83,7 +88,7 @@ describe("BOM engine", () => {
   it("acceptance: 15x30 polygonal with weights, fronts, transparent sides and an open-roof bay", () => {
     const c = acceptanceConfig();
     const r = bom(c);
-    expect(fam("fam-15b").roofShape).toBe("poligonal");
+    expect(fam("fam-15b-pol").roofShape).toBe("poligonal");
     expect(r.metrics).toMatchObject({ largo: 30, ancho: 15, superficie: 450, perimetro: 90 });
     expect(qty(r.lines, "item-c15b")).toBe(7);
     expect(qty(r.lines, "item-techo-15-blanco")).toBe(5);
@@ -101,7 +106,7 @@ describe("BOM engine", () => {
     expect(r.metrics.aforo.coctel).toBe(562);
 
     // 3D coherence: every drawn part is backed by the BOM
-    const parts = generateTentParts(c, fam("fam-15b"));
+    const parts = generateTentParts(c, fam("fam-15b-pol"));
     const cover = coverPartsWithBom(parts, r.lines, fixtureItems);
     expect(cover.gaps).toEqual([]);
     expect(cover.drawable).toHaveLength(parts.length);
@@ -198,7 +203,8 @@ describe("BOM engine", () => {
 describe("geometry", () => {
   it("builds two-pitch and polygonal profiles", () => {
     expect(roofProfile(fam("fam-10b"))).toHaveLength(3);
-    expect(roofProfile(fam("fam-15a"))).toHaveLength(7);
+    expect(roofProfile(fam("fam-15a"))).toHaveLength(3);
+    expect(roofProfile(fam("fam-15b-pol"))).toHaveLength(7);
     const pts = pointsAlong(roofProfile(fam("fam-10b")), 5);
     expect(pts).toHaveLength(5);
     expect(pts[2]![0]).toBeCloseTo(0);

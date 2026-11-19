@@ -27,3 +27,6 @@ Cada línea: decisión — motivo. Los valores marcados **[SUPUESTO]** son datos
 - Tarifas: €/m² por familia, suplementos por lona transparente, ventana, puerta y pesos; transporte 1,60 €/km ida y vuelta con mínimo de 90 €; mano de obra 30 €/h (coste 19 €/h).
 - Escalado por duración (1 d ×1; 2 d ×1,5; 3 d ×1,8; 7 d ×2,6; +0,2 por día extra) y carpas con 3 días incluidos y +8 % por día adicional.
 - Descanso mínimo entre jornadas 12 h y límite semanal 40 h (Estatuto de los Trabajadores) — configurable por trabajador.
+- Todas las carpas del catálogo se dibujan a dos aguas (petición del cliente) — la cubierta poligonal sigue soportada por el motor y el visor como opción de familia, y el test de aceptación 15x30 la cubre con una variante poligonal.
+- Familia 20 m alta con 20 módulos máximos (20x100) — necesario para el criterio de rendimiento; el stock real de C20A (20) limita a 20x95 y el configurador lo marca en rojo.
+- Solo los subalquileres confirmados o recibidos suman stock entrante — uno solicitado aún no está garantizado.
