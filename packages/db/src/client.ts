@@ -44,8 +44,8 @@ export const APP_ROLE = "rentevent_app";
 export async function withTenant<T>(tenantId: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
   if (!tenantId) throw new Error("withTenant: tenantId requerido");
   return systemDb().transaction(async (tx) => {
-    await tx.execute(sql.raw(`set local role ${APP_ROLE}`));
-    await tx.execute(sql`select set_config('app.tenant_id', ${tenantId}, true)`);
+    // one round trip: `set_config('role', …, true)` is the function form of SET LOCAL ROLE
+    await tx.execute(sql`select set_config('role', ${APP_ROLE}, true), set_config('app.tenant_id', ${tenantId}, true)`);
     return fn(tx);
   });
 }

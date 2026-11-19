@@ -17,15 +17,22 @@ export const getAuthSession = cache(async () => {
 });
 
 export type Membership = { tenantId: string; slug: string; name: string; logo: string | null; role: string };
+type MembershipRow = Membership & { settings: typeof tenantSettings.$inferSelect | null };
 
-export const getMemberships = cache(async (userId: string): Promise<Membership[]> => {
+/** Memberships with each tenant's settings in a single query (one round trip per request). */
+const getMembershipRows = cache(async (userId: string): Promise<MembershipRow[]> => {
   return systemDb()
-    .select({ tenantId: organization.id, slug: organization.slug, name: organization.name, logo: organization.logo, role: member.role })
+    .select({ tenantId: organization.id, slug: organization.slug, name: organization.name, logo: organization.logo, role: member.role, settings: tenantSettings })
     .from(member)
     .innerJoin(organization, eq(member.organizationId, organization.id))
+    .leftJoin(tenantSettings, eq(tenantSettings.tenantId, organization.id))
     .where(eq(member.userId, userId))
     .orderBy(asc(organization.name));
 });
+
+export const getMemberships = cache(async (userId: string): Promise<Membership[]> =>
+  (await getMembershipRows(userId)).map(({ settings: _settings, ...m }) => m),
+);
 
 export type AppContext = {
   user: { id: string; name: string; email: string; image: string | null; twoFactorEnabled: boolean };
@@ -45,13 +52,14 @@ export type AppContext = {
 export const getAppContext = cache(async (): Promise<AppContext | null> => {
   const s = await getAuthSession();
   if (!s) return null;
+  const rows = await getMembershipRows(s.user.id);
+  if (rows.length === 0) return null;
   const memberships = await getMemberships(s.user.id);
-  if (memberships.length === 0) return null;
   const h = await headers();
   const c = await cookies();
   const wanted = h.get("x-tenant-slug") ?? c.get(ACTIVE_TENANT_COOKIE)?.value ?? null;
-  const m = memberships.find((x) => x.slug === wanted || x.tenantId === wanted) ?? memberships[0]!;
-  const [settings] = await systemDb().select().from(tenantSettings).where(eq(tenantSettings.tenantId, m.tenantId));
+  const m = rows.find((x) => x.slug === wanted || x.tenantId === wanted) ?? rows[0]!;
+  const settings = m.settings;
   return {
     user: { id: s.user.id, name: s.user.name, email: s.user.email, image: s.user.image ?? null, twoFactorEnabled: Boolean((s.user as { twoFactorEnabled?: boolean }).twoFactorEnabled) },
     sessionId: s.session.id,

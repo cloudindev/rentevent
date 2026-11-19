@@ -16,6 +16,8 @@ const nextConfig: NextConfig = {
   typedRoutes: false,
   poweredByHeader: false,
   devIndicators: false,
+  // reuse already-visited dynamic pages for 30 s when moving back and forth (mutations still refresh them)
+  experimental: { staleTimes: { dynamic: 30 } },
   images: { formats: ["image/avif", "image/webp"] },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];

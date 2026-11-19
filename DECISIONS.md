@@ -31,3 +31,10 @@ Cada línea: decisión — motivo. Los valores marcados **[SUPUESTO]** son datos
 - Familia 20 m alta con 20 módulos máximos (20x100) — necesario para el criterio de rendimiento; el stock real de C20A (20) limita a 20x95 y el configurador lo marca en rojo.
 - Solo los subalquileres confirmados o recibidos suman stock entrante — uno solicitado aún no está garantizado.
 - pg 8 encola las consultas lanzadas en paralelo dentro de una misma transacción (aviso de deprecación) — se mantiene pg 8.x fijado; al migrar a pg 9 hay que serializar los Promise.all dentro de withTenant.
+
+## Rendimiento en producción (Vercel + Supabase)
+- Funciones de Vercel fijadas en `dub1` (Dublín) en `apps/web/vercel.json`, junto a Supabase `eu-west-1`. Por defecto corrían en `iad1` (EE. UU.) y cada consulta cruzaba el Atlántico. Además mantiene el tratamiento de datos en la UE.
+- `withTenant` cambia de rol y fija el tenant en una sola sentencia (`set_config('role', …, true)`): un viaje menos por petición.
+- Sesión con caché en cookie firmada de 2 minutos (Better Auth `cookieCache`): evita consultar sesión y usuario en cada navegación. Una sesión revocada sigue válida como máximo 2 minutos.
+- Contexto de la app: pertenencias y ajustes de empresa en una sola consulta.
+- Caché del router del cliente `staleTimes.dynamic = 30`: volver a una vista visitada hace menos de 30 s es instantáneo; las acciones que modifican datos la refrescan.

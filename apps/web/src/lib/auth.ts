@@ -74,6 +74,9 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24 * 30,
     updateAge: 60 * 60 * 24,
+    // signed cookie cache: avoids a session + user query on every navigation;
+    // a revoked session stays valid for at most this long
+    cookieCache: { enabled: true, maxAge: 2 * 60 },
   },
   rateLimit: {
     enabled: true,
