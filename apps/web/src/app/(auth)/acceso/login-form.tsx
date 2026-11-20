@@ -7,13 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/menu";
 
-export function LoginForm({ social, demo }: { social: { google: boolean; microsoft: boolean }; demo: boolean }) {
+export function LoginForm({ social }: { social: { google: boolean; microsoft: boolean } }) {
   const router = useRouter();
   const params = useSearchParams();
   const next = params.get("next") ?? "/app/inicio";
   const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/app/inicio";
-  const [email, setEmail] = useState(demo ? "demo@rentevent.es" : "");
-  const [password, setPassword] = useState(demo ? "Rentevent2026!" : "");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
