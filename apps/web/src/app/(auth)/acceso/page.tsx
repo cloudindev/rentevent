@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { env } from "@/lib/env";
 import { AuthSplit } from "@/components/auth-split";
 import { LoginForm } from "./login-form";
 
@@ -18,7 +17,7 @@ export default function LoginPage() {
         </Link>
       </p>
       <Suspense>
-        <LoginForm social={{ google: Boolean(env.google), microsoft: Boolean(env.microsoft) }} />
+        <LoginForm />
       </Suspense>
     </AuthSplit>
   );

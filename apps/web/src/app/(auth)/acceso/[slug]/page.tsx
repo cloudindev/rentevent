@@ -52,7 +52,7 @@ export default async function CompanyLogin({ params }: { params: Promise<{ slug:
       <h1 className="text-2xl font-semibold">Entrar en {c.name}</h1>
       <p className="mt-1 mb-6 text-sm text-muted-foreground">Usa tu cuenta de Rentevent.</p>
       <Suspense>
-        <LoginForm social={{ google: Boolean(env.google), microsoft: Boolean(env.microsoft) }} />
+        <LoginForm />
       </Suspense>
     </AuthSplit>
   );
