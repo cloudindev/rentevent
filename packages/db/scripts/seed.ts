@@ -32,7 +32,7 @@ export const DEMO = {
   name: "Carpas del Norte",
   password: "Rentevent2026!",
   users: [
-    { id: "usr_demo_admin", name: "Lucía Fernández", email: "demo@rentevent.es", role: "administrador" },
+    { id: "usr_demo_admin", name: "David Famos del Busto", email: "demo@rentevent.es", role: "administrador" },
     { id: "usr_demo_comercial", name: "Marcos Álvarez", email: "comercial@rentevent.es", role: "comercial" },
     { id: "usr_demo_almacen", name: "Iván Suárez", email: "almacen@rentevent.es", role: "jefe_almacen" },
     { id: "usr_demo_jefe", name: "Rubén Menéndez", email: "jefe@rentevent.es", role: "jefe_equipo" },
@@ -823,7 +823,7 @@ async function seedOps(tx: Tx, ids: Ids) {
     { name: "Enviar planning los viernes", trigger: "semanal", conditions: [], action: { type: "publicar_planning", channel: "push" }, active: false },
   ]);
   await tx.insert(s.announcements).values([
-    { title: "Revisión de EPIs", body: "Antes del mercado navideño todos los arneses deben pasar revisión en la nave. Iván tiene la lista.", authorName: "Lucía Fernández", pinned: true },
+    { title: "Revisión de EPIs", body: "Antes del mercado navideño todos los arneses deben pasar revisión en la nave. Iván tiene la lista.", authorName: "David Famos del Busto", pinned: true },
     { title: "Nueva furgoneta", body: "Ya está disponible la furgoneta 9012 MPS para recogidas pequeñas.", authorName: "Iván Suárez" },
   ]);
   await tx.insert(s.notifications).values([
@@ -831,7 +831,7 @@ async function seedOps(tx: Tx, ids: Ids) {
     { channel: "email", recipient: "ana.rodriguez@correo.example", title: "Presupuesto enviado", body: "Presupuesto de boda", status: "simulada" },
     { channel: "whatsapp", recipient: "+34 655 123 456", title: "Recordatorio visita técnica", body: "Mañana a las 10:00 en el prado", status: "simulada" },
   ]);
-  await tx.insert(s.auditLog).values({ userId: "usr_demo_admin", userName: "Lucía Fernández", entity: "tenant", entityId: DEMO.tenantId, action: "crear", diff: { seed: true } });
+  await tx.insert(s.auditLog).values({ userId: "usr_demo_admin", userName: "David Famos del Busto", entity: "tenant", entityId: DEMO.tenantId, action: "crear", diff: { seed: true } });
   void randomUUID;
 }
 
