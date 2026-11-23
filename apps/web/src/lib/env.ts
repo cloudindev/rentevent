@@ -26,10 +26,6 @@ export const env = {
       }
     : null,
   stripe: v("STRIPE_SECRET_KEY") ? { secretKey: v("STRIPE_SECRET_KEY")!, webhookSecret: v("STRIPE_WEBHOOK_SECRET") ?? "" } : null,
-  google: v("GOOGLE_CLIENT_ID") ? { clientId: v("GOOGLE_CLIENT_ID")!, clientSecret: v("GOOGLE_CLIENT_SECRET") ?? "" } : null,
-  microsoft: v("MICROSOFT_CLIENT_ID")
-    ? { clientId: v("MICROSOFT_CLIENT_ID")!, clientSecret: v("MICROSOFT_CLIENT_SECRET") ?? "", tenantId: v("MICROSOFT_TENANT_ID") ?? "common" }
-    : null,
   geocoder: v("GEOCODER_URL") ?? null,
   whatsapp: v("WHATSAPP_TOKEN") ? { token: v("WHATSAPP_TOKEN")!, phoneNumberId: v("WHATSAPP_PHONE_NUMBER_ID") ?? "" } : null,
   anthropicKey: v("ANTHROPIC_API_KEY"),
@@ -43,8 +39,6 @@ export const serviceModes = (): Record<string, ServiceMode> => ({
   Correo: env.smtpUrl ? "real" : "simulado",
   Almacenamiento: env.s3 ? "real" : "simulado",
   Pagos: env.stripe ? "real" : "simulado",
-  "Google OAuth": env.google ? "real" : "simulado",
-  "Microsoft OAuth": env.microsoft ? "real" : "simulado",
   Mapas: env.geocoder ? "real" : "simulado",
   WhatsApp: env.whatsapp ? "real" : "simulado",
   "Asistente IA": env.anthropicKey ? "real" : "simulado",

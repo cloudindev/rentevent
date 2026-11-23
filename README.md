@@ -69,8 +69,8 @@ cola de trabajos, buzón simulado) no son accesibles desde ese rol.
    - `DEMO_MODE=false` en producción real
 3. **Dominios**: añade `rentevent.es` y el comodín `*.rentevent.es` para el subdominio de cada empresa.
 4. **Cron**: `apps/web/vercel.json` ejecuta `/api/cron` una vez al día (límite del plan Hobby). En Pro puede ponerse `*/15 * * * *`, o llamarse desde cualquier cron externo con `Authorization: Bearer $CRON_SECRET`.
-5. Servicios opcionales (cada uno pasa de simulado a real al poner su clave): SMTP, S3 (UE), Stripe, Google/Microsoft
-   OAuth, WhatsApp Cloud API, geocodificador Nominatim, Anthropic (asistente IA), VAPID (push), Redis (BullMQ).
+5. Servicios opcionales (cada uno pasa de simulado a real al poner su clave): SMTP, S3 (UE), Stripe,
+   WhatsApp Cloud API, geocodificador Nominatim, Anthropic (asistente IA), VAPID (push), Redis (BullMQ).
    La lista completa está en `.env.example`; el estado de cada servicio se ve en *Configuración › Integraciones*.
 
 ### Contenedor

@@ -65,12 +65,6 @@ export const auth = betterAuth({
       });
     },
   },
-  socialProviders: {
-    ...(env.google ? { google: { clientId: env.google.clientId, clientSecret: env.google.clientSecret } } : {}),
-    ...(env.microsoft
-      ? { microsoft: { clientId: env.microsoft.clientId, clientSecret: env.microsoft.clientSecret, tenantId: env.microsoft.tenantId } }
-      : {}),
-  },
   session: {
     expiresIn: 60 * 60 * 24 * 30,
     updateAge: 60 * 60 * 24,
