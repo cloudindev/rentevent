@@ -31,7 +31,8 @@ const getMembershipRows = cache(async (userId: string): Promise<MembershipRow[]>
 });
 
 export const getMemberships = cache(async (userId: string): Promise<Membership[]> =>
-  (await getMembershipRows(userId)).map(({ settings: _settings, ...m }) => m),
+  // the logo uploaded in Configuración lives in tenant settings; organization.logo is the fallback
+  (await getMembershipRows(userId)).map(({ settings, ...m }) => ({ ...m, logo: settings?.logoUrl ?? m.logo })),
 );
 
 export type AppContext = {

@@ -21,7 +21,7 @@ const ADVANTAGES = [
   { icon: Cuboid, title: "Presupuestos con 3D", text: "El cliente ve su carpa, el plano acotado y el precio en el mismo enlace, y lo acepta con su firma.", href: "/producto/visor-3d" },
 ];
 
-const INTEGRATIONS = ["Stripe", "Google", "Microsoft 365", "WhatsApp", "Calendario ICS", "Exportación contable", "API REST", "Webhooks"];
+const INTEGRATIONS = ["Stripe", "WhatsApp", "Calendario ICS", "Exportación contable", "API REST", "Webhooks"];
 
 export default function HomePage() {
   return (
@@ -177,7 +177,7 @@ export default function HomePage() {
               ))}
             </ul>
           </div>
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {INTEGRATIONS.map((i) => (
               <li key={i} className="flex h-20 flex-col items-center justify-center gap-1.5 rounded-2xl bg-white text-center text-sm font-medium text-foreground shadow-sm">
                 <Plug className="size-4 text-brand-600" aria-hidden />
