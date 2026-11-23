@@ -273,8 +273,8 @@ export function Board({ data }: { data: BoardData }) {
                   .concat([{ p: { id: "_", name: "Sin proyecto", color: null }, list: visible.filter((s) => !s.projectId) }])
                   .filter((x) => x.list.length > 0)
                   .map(({ p, list }) => (
-                    <Row key={p.id} label={<span className="flex items-center gap-2 text-sm"><span className="size-2.5 rounded-full" style={{ background: p.color ?? "#6b6b68" }} />{p.id === "_" ? p.name : <Link className="truncate hover:underline" href={`/app/proyectos/${p.id}`}>{p.name}</Link>}</span>} days={data.range.days}>
-                      <Blocks items={list.map((s) => ({ ...s, key: s.id }))} range={data.range} render={(s) => <ShiftBlock s={s} label={`${crewOf(s.id).length}/${s.requiredPeople}`} onClick={() => setSelected(s.id)} uncovered={crewOf(s.id).length < s.requiredPeople} />} />
+                    <Row key={p.id} label={<span className="flex min-w-0 items-center gap-2 text-sm" title={p.name}><span className="size-2.5 shrink-0 rounded-full" style={{ background: p.color ?? "#6b6b68" }} />{p.id === "_" ? <span className="truncate">{p.name}</span> : <Link className="line-clamp-2 hover:underline" href={`/app/proyectos/${p.id}`}>{p.name}</Link>}</span>} days={data.range.days}>
+                      <Blocks items={list.map((s) => ({ ...s, key: s.id }))} range={data.range} render={(s) => <ShiftBlock s={s} inProjectRow label={`${crewOf(s.id).length}/${s.requiredPeople}`} onClick={() => setSelected(s.id)} uncovered={crewOf(s.id).length < s.requiredPeople} />} />
                     </Row>
                   ))}
               </>
@@ -416,8 +416,13 @@ function Blocks<T extends { start: number; end: number; key: string }>({ items, 
   );
 }
 
-function ShiftBlock({ s, label, status, onClick, drag, uncovered }: { s: BoardShift; label?: string; status?: string; onClick: () => void; drag?: Record<string, unknown>; uncovered?: boolean }) {
+function ShiftBlock({ s, label, status, onClick, drag, uncovered, inProjectRow }: { s: BoardShift; label?: string; status?: string; onClick: () => void; drag?: Record<string, unknown>; uncovered?: boolean; inProjectRow?: boolean }) {
   const color = PHASE_COLOR[s.phaseKind] ?? PHASE_COLOR.otro;
+  const phase = PHASE_LABELS[s.phaseKind as PhaseKind] ?? s.phaseKind;
+  // in a project row the project is already the row label: lead with the phase (or a custom title)
+  const autoTitle = s.title === `${phase} · ${s.projectName}`;
+  const heading = inProjectRow ? (autoTitle ? phase : s.title) : (s.projectName ?? s.title);
+  const showPhase = !(inProjectRow && autoTitle);
   return (
     <button
       type="button"
@@ -434,7 +439,7 @@ function ShiftBlock({ s, label, status, onClick, drag, uncovered }: { s: BoardSh
       style={{ borderLeft: `3px solid ${color}`, background: `color-mix(in oklab, ${color} ${s.published ? 14 : 6}%, var(--card))` }}
     >
       <span className="flex w-full min-w-0 items-center gap-1.5">
-        <span className="truncate font-semibold">{s.projectName ?? s.title}</span>
+        <span className="truncate font-semibold">{heading}</span>
         {label && <span className={cn("ml-auto shrink-0 rounded bg-background/70 px-1 text-[10px] font-medium tabular", uncovered && "text-warning")}>{label}</span>}
         {status === "confirmado" && <span className="ml-auto size-1.5 shrink-0 rounded-full bg-success" aria-label="Confirmado" />}
       </span>
@@ -442,7 +447,7 @@ function ShiftBlock({ s, label, status, onClick, drag, uncovered }: { s: BoardSh
         <span className="shrink-0 tabular">
           {formatTime(s.start)}–{formatTime(s.end)}
         </span>
-        <span className="truncate">· {PHASE_LABELS[s.phaseKind as PhaseKind] ?? s.phaseKind}</span>
+        {showPhase && <span className="truncate">· {phase}</span>}
       </span>
     </button>
   );
