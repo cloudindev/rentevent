@@ -81,10 +81,13 @@ export function PickListDetail({ list, order, clientName, lines: initial, note, 
         setLastScan(`✕ ${r.error}`);
         return;
       }
-      setLastScan(`✓ ${r.data.name}${r.data.serial ? ` · ${r.data.serial}` : ""} (${r.data.count}/${r.data.quantity})`);
+      setLastScan(`✓ ${r.data.message}${r.data.warnings.length ? ` · ${r.data.warnings.join(" · ")}` : ""}`);
+      if (r.data.warnings.length) toast.warning(r.data.warnings.join("\n"));
+      else if (!scan) toast.success(r.data.message); // scanned from the phone: the inline result is not visible
       if ("vibrate" in navigator) navigator.vibrate?.(40);
       router.refresh();
-      setLines((ls) => ls.map((x) => (x.name === r.data.name ? { ...x, [isOut ? "prepared" : "returned"]: r.data.count, scannedUnits: r.data.serial ? [...x.scannedUnits, r.data.serial] : x.scannedUnits } : x)));
+      const upd = new Map(r.data.lines.map((u) => [u.id, u]));
+      setLines((ls) => ls.map((x) => { const u = upd.get(x.id); return u ? { ...x, [r.data.field]: u.count, scannedUnits: u.scannedUnits } : x; }));
     });
 
   const consumed = useRef(false);
@@ -176,7 +179,7 @@ export function PickListDetail({ list, order, clientName, lines: initial, note, 
           <section className="space-y-2 rounded-xl border bg-card p-4">
             <QrScanner onScan={onScan} paused={pending} />
             {lastScan && <p className={cn("text-sm", lastScan.startsWith("✕") ? "text-danger" : "text-success")} aria-live="polite">{lastScan}</p>}
-            <p className="text-xs text-muted-foreground">Escanea el QR de cada unidad seriada o el código del artículo (SKU). En el móvil también puedes usar <Link className="text-link underline" href={`/m/escanear?volver=/app/almacen/${list.id}`}>el escáner de la app</Link>.</p>
+            <p className="text-xs text-muted-foreground">Escanea el QR de cada unidad, de una caja o conjunto (cuenta todo lo que lleva dentro) o el código del artículo (SKU). En el móvil también puedes usar <Link className="text-link underline" href={`/m/escanear?volver=/app/almacen/${list.id}`}>el escáner de la app</Link>.</p>
           </section>
         )}
 

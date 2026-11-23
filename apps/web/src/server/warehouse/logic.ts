@@ -134,3 +134,139 @@ export function matchScan(code: string, lines: { id: string; itemId: string; sku
 
 /** Current time (kept out of render bodies for the React purity lint rule). */
 export const nowMs = () => Date.now();
+
+// ───────────── Serial tracking: label codes, cases and sets ─────────────
+
+/** Accepts a raw code or a printed label URL (…/q/<code>) and returns the stored code. */
+export function normalizeCode(raw: string): string {
+  const c = raw.trim();
+  const m = c.match(/\/q\/([^/?#\s]+)\/?(?:[?#].*)?$/);
+  if (!m) return c;
+  try {
+    return decodeURIComponent(m[1]!);
+  } catch {
+    return m[1]!;
+  }
+}
+
+/** URL encoded in printed QR labels: opens the unit's page from any phone camera. */
+export const labelUrl = (appUrl: string, code: string) => `${appUrl.replace(/\/$/, "")}/q/${encodeURIComponent(code)}`;
+
+export const CONTAINER_LABEL: Record<string, string> = { caja: "Caja de transporte", conjunto: "Conjunto" };
+
+export type TreeUnit = { id: string; itemId: string; serial: string; parentUnitId: string | null };
+export type TreeContent = { containerUnitId: string; itemId: string; quantity: number };
+
+/**
+ * Everything packed inside a case or set, recursively (sets inside a case).
+ * Guards against cycles and absurd nesting.
+ */
+export function expandContainer(rootId: string, units: TreeUnit[], contents: TreeContent[], maxDepth = 4): { units: TreeUnit[]; bulk: { itemId: string; quantity: number }[] } {
+  const byParent = new Map<string, TreeUnit[]>();
+  for (const u of units) if (u.parentUnitId) byParent.set(u.parentUnitId, [...(byParent.get(u.parentUnitId) ?? []), u]);
+  const out: TreeUnit[] = [];
+  const bulk = new Map<string, number>();
+  const seen = new Set([rootId]);
+  const walk = (id: string, depth: number) => {
+    for (const c of contents) if (c.containerUnitId === id) bulk.set(c.itemId, (bulk.get(c.itemId) ?? 0) + c.quantity);
+    if (depth >= maxDepth) return;
+    for (const child of byParent.get(id) ?? []) {
+      if (seen.has(child.id)) continue;
+      seen.add(child.id);
+      out.push(child);
+      walk(child.id, depth + 1);
+    }
+  };
+  walk(rootId, 0);
+  return { units: out, bulk: [...bulk].map(([itemId, quantity]) => ({ itemId, quantity })) };
+}
+
+/** True when `candidate` is `unitId` itself or packed (at any depth) inside it — packing it would create a loop. */
+export function wouldCycle(unitId: string, candidateParentId: string, parentOf: Map<string, string | null>): boolean {
+  let cur: string | null | undefined = candidateParentId;
+  for (let i = 0; cur && i < 50; i++) {
+    if (cur === unitId) return true;
+    cur = parentOf.get(cur);
+  }
+  return false;
+}
+
+type ScanLine = { id: string; itemId: string; quantity: number; prepared: number; returned: number; damaged: number; lost: number; scannedUnits: string[] };
+export type Skip = { itemId: string; serial: string | null; reason: "no_en_lista" | "completo" };
+
+/**
+ * Applies a whole case/set to a pick list: each serial inside counts one, bulk
+ * contents count their quantity, capped per line. Already-scanned serials are ignored.
+ */
+export function containerScanPlan(lines: ScanLine[], kind: PickKind, found: { units: { itemId: string; serial: string }[]; bulk: { itemId: string; quantity: number }[] }) {
+  const field = kind === "salida" ? "prepared" : "returned";
+  const state = new Map<string, { count: number; serials: string[] }>();
+  const skipped: Skip[] = [];
+  let added = 0;
+  const cap = (l: ScanLine) => (kind === "salida" ? l.quantity : l.quantity - l.damaged - l.lost);
+  const get = (l: ScanLine) => {
+    let st = state.get(l.id);
+    if (!st) state.set(l.id, (st = { count: l[field], serials: [...l.scannedUnits] }));
+    return st;
+  };
+  for (const u of found.units) {
+    const line = lines.find((l) => l.itemId === u.itemId);
+    if (!line) {
+      skipped.push({ itemId: u.itemId, serial: u.serial, reason: "no_en_lista" });
+      continue;
+    }
+    const st = get(line);
+    if (st.serials.includes(u.serial)) continue;
+    if (st.count >= cap(line)) {
+      skipped.push({ itemId: u.itemId, serial: u.serial, reason: "completo" });
+      continue;
+    }
+    st.count++;
+    st.serials.push(u.serial);
+    added++;
+  }
+  for (const b of found.bulk) {
+    const line = lines.find((l) => l.itemId === b.itemId);
+    if (!line) {
+      skipped.push({ itemId: b.itemId, serial: null, reason: "no_en_lista" });
+      continue;
+    }
+    const st = get(line);
+    const add = Math.max(0, Math.min(b.quantity, cap(line) - st.count));
+    st.count += add;
+    added += add;
+    if (add < b.quantity) skipped.push({ itemId: b.itemId, serial: null, reason: "completo" });
+  }
+  return { field, added, skipped, updates: [...state].map(([lineId, s]) => ({ lineId, count: s.count, serials: s.serials })) };
+}
+
+export const UNIT_STATUS_LABEL: Record<string, string> = { disponible: "Disponible", en_obra: "En evento", reparacion: "En reparación", limpieza: "En limpieza", baja: "De baja", perdida: "Perdida" };
+export const UNIT_STATUS_TONE: Record<string, "success" | "info" | "warning" | "danger" | "neutral"> = { disponible: "success", en_obra: "info", reparacion: "warning", limpieza: "warning", baja: "neutral", perdida: "danger" };
+export const UNIT_EVENT_LABEL: Record<string, string> = {
+  alta: "Alta",
+  salida: "Salida a evento",
+  retorno: "Vuelta al almacén",
+  danado: "Volvió dañada",
+  perdido: "No volvió",
+  reparacion: "A reparación",
+  limpieza: "A limpieza",
+  reparado: "Reparada",
+  baja: "Dada de baja",
+  revision: "Revisión",
+  traslado: "Cambio de ubicación",
+  empaquetado: "Metida en caja",
+  desempaquetado: "Sacada de caja",
+  contenido: "Contenido cambiado",
+  estado: "Cambio de estado",
+};
+
+/** One-line answer to "where is this unit?" */
+export function unitWhere(u: { status: string; parent?: { name: string; serial: string } | null; order?: { number: string; title?: string | null } | null; warehouseName?: string | null; shelf?: string | null }): string {
+  const place = [u.warehouseName, u.shelf].filter(Boolean).join(" · ");
+  if (u.parent) return `Dentro de ${u.parent.serial}`;
+  if (u.status === "perdida") return u.order ? `Perdida en el pedido ${u.order.number}` : "Perdida";
+  if (u.status === "en_obra") return u.order ? `En el pedido ${u.order.number}${u.order.title ? ` · ${u.order.title}` : ""}` : "Fuera, en un evento";
+  if (u.status === "reparacion" || u.status === "limpieza") return `Taller${place ? ` · ${place}` : ""}`;
+  if (u.status === "baja") return "Dada de baja";
+  return place || "Almacén (sin ubicación)";
+}

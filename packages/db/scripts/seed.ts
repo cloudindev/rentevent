@@ -25,6 +25,7 @@ import { fixtureFamilies, fixtureItems, fixturePricePerM2, fixtureRules, fixture
 import { eq, inArray } from "drizzle-orm";
 import { closeDb, systemDb, type Tx, withTenant } from "../src/client";
 import * as s from "../src/schema";
+import { seedTracking } from "./seed-tracking";
 
 export const DEMO = {
   tenantId: "org_demo_carpasdelnorte",
@@ -189,6 +190,7 @@ async function main() {
     ]);
 
     const cat = await catalogue(tx);
+    await seedTracking(tx, cat.warehouse);
     const ids: Ids = { ...cat, contacts: {}, venues: {}, workers: [], vehicles: [] };
 
     // ── Contacts

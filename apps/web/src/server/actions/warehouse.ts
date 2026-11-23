@@ -1,11 +1,12 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { and, deliveryNotes, eq, inArray, itemUnits, items, orders, pickListLines, pickLists } from "@rentevent/db";
+import { and, deliveryNotes, eq, inArray, items, orders, pickListLines, pickLists } from "@rentevent/db";
 import { tenantAction, UserError } from "../action";
 import { audit } from "../audit";
 import { nextCounter } from "../numbering";
-import { clampCount, deliveryNoteNumber, matchScan } from "../warehouse/logic";
+import { clampCount, containerScanPlan, deliveryNoteNumber, matchScan, normalizeCode, type PickKind } from "../warehouse/logic";
+import { containerContents, findUnitByCode } from "../warehouse/tracking";
 import { closeReturn as closeReturnSvc, createPickList, loadPickList, markLoaded as markLoadedSvc, refreshStatuses } from "../warehouse/picklists";
 
 const id = z.string().uuid();
@@ -53,29 +54,79 @@ export const markAll = tenantAction(z.object({ listId: id, field: z.enum(["prepa
   return { ok: true };
 });
 
-/** Scan: serial QR (item_units.qr_code) or the item SKU; increments prepared (salida) or returned (retorno). */
-export const scanCode = tenantAction(z.object({ listId: id, code: z.string().trim().min(1).max(120) }), "almacen", async ({ listId, code }, tx) => {
+const STATUS_TEXT: Record<string, string> = { disponible: "disponible", en_obra: "fuera en otro evento", reparacion: "en reparación", limpieza: "en limpieza", baja: "dada de baja", perdida: "perdida" };
+
+/**
+ * Scan on a pick list. Accepts a unit QR (or label URL), a serial number or an
+ * item SKU. A case or set counts everything packed inside it at once.
+ * Outgoing lists only take available units; returns only units out on this order.
+ */
+export const scanCode = tenantAction(z.object({ listId: id, code: z.string().trim().min(1).max(300) }), "almacen", async ({ listId, code: raw }, tx) => {
   const data = await loadPickList(tx, listId);
   if (!data) throw new UserError("Lista no encontrada");
-  const units = await tx.select({ qr: itemUnits.qrCode, itemId: itemUnits.itemId, serial: itemUnits.serial }).from(itemUnits).where(eq(itemUnits.qrCode, code.trim()));
-  const hit = matchScan(code, data.lines, new Map(units.map((u) => [u.qr, { itemId: u.itemId, serial: u.serial }])));
-  if (!hit) {
-    const [other] = units.length ? await tx.select({ name: items.name }).from(items).where(eq(items.id, units[0]!.itemId)) : [undefined];
-    throw new UserError(other ? `${other.name} no está en esta lista.` : `Código ${code} no reconocido.`);
+  if (data.list.status === "en_obra" || (data.list.kind === "retorno" && data.list.status === "devuelto")) throw new UserError("La lista ya está cerrada.");
+  const kind = data.list.kind as PickKind;
+  const orderId = data.list.orderId;
+  const field = kind === "salida" ? "prepared" : "returned";
+  const code = normalizeCode(raw);
+  const hit = await findUnitByCode(tx, code);
+  const usable = (u: { status: string; currentOrderId: string | null }) =>
+    kind === "salida" ? u.status === "disponible" : u.status === "en_obra" && (u.currentOrderId === orderId || u.currentOrderId === null);
+  const refuse = (name: string, u: { serial: string; status: string }) =>
+    new UserError(kind === "salida" ? `${name} ${u.serial} no está disponible: ${STATUS_TEXT[u.status] ?? u.status}.` : `${name} ${u.serial} no salió en este pedido.`);
+
+  if (hit?.item.container) {
+    if (!usable(hit.unit)) throw refuse(hit.item.name, hit.unit);
+    const inside = await containerContents(tx, hit.unit.id);
+    const ownLine = data.lines.some((l) => l.itemId === hit.unit.itemId);
+    const candidates = [...(ownLine ? [{ ...hit.unit, container: hit.item.container }] : []), ...inside.units];
+    const ok = candidates.filter(usable);
+    const bad = candidates.filter((u) => !usable(u) && !u.container);
+    const plan = containerScanPlan(data.lines, kind, { units: ok.filter((u) => ownLine || u.id !== hit.unit.id), bulk: inside.bulk });
+    const changed = plan.updates.filter((u) => {
+      const l = data.lines.find((x) => x.id === u.lineId)!;
+      return u.count !== l[field] || u.serials.length !== l.scannedUnits.length;
+    });
+    for (const u of changed) await tx.update(pickListLines).set({ [field]: u.count, scannedUnits: u.serials }).where(eq(pickListLines.id, u.lineId));
+    const boxes = [hit.unit.id, ...inside.units.filter((u) => u.container && usable(u)).map((u) => u.id)];
+    await tx.update(pickLists).set({ scannedContainers: [...new Set([...data.list.scannedContainers, ...boxes])] }).where(eq(pickLists.id, listId));
+    await refreshStatuses(tx, listId);
+    revalidatePath(`/app/almacen/${listId}`);
+    const names = new Map((await tx.select({ id: items.id, name: items.name }).from(items).where(inArray(items.id, [...new Set([...plan.skipped.map((x) => x.itemId), ...bad.map((b) => b.itemId)])].concat(hit.unit.itemId)))).map((i) => [i.id, i.name]));
+    const notOnList = plan.skipped.filter((x) => x.reason === "no_en_lista" && !inside.units.some((u) => u.serial === x.serial && u.container));
+    const full = plan.skipped.filter((x) => x.reason === "completo");
+    const warnings = [
+      ...bad.map((u) => `${names.get(u.itemId) ?? ""} ${u.serial}: ${kind === "salida" ? STATUS_TEXT[u.status] ?? u.status : "no salió en este pedido"}`),
+      ...(notOnList.length ? [`No están en este pedido: ${[...new Set(notOnList.map((x) => names.get(x.itemId)))].join(", ")}`] : []),
+      ...(full.length ? [`Ya completos: ${[...new Set(full.map((x) => names.get(x.itemId)))].join(", ")}`] : []),
+    ];
+    if (plan.added === 0 && !changed.length) throw new UserError(`${hit.item.name} ${hit.unit.serial}: no hay nada que sumar a esta lista.${warnings.length ? ` ${warnings.join(". ")}.` : ""}`);
+    return {
+      message: `${hit.item.name} ${hit.unit.serial}: ${plan.added} ${plan.added === 1 ? "unidad" : "unidades"}`,
+      field,
+      lines: changed.map((u) => ({ id: u.lineId, count: u.count, scannedUnits: u.serials })),
+      warnings,
+    };
   }
-  const line = data.lines.find((l) => l.id === hit.lineId)!;
-  if (hit.serial && line.scannedUnits.includes(hit.serial)) throw new UserError(`La unidad ${hit.serial} ya está escaneada.`);
-  const field = data.list.kind === "salida" ? "prepared" : "returned";
-  const current = field === "prepared" ? line.prepared : line.returned;
+
+  if (hit && !usable(hit.unit)) throw refuse(hit.item.name, hit.unit);
+  const hitLine = matchScan(code, data.lines, hit ? new Map([[code, { itemId: hit.unit.itemId, serial: hit.unit.serial }]]) : new Map());
+  if (!hitLine) throw new UserError(hit ? `${hit.item.name} no está en esta lista.` : `Código ${code} no reconocido.`);
+  const line = data.lines.find((l) => l.id === hitLine.lineId)!;
+  if (hitLine.serial && line.scannedUnits.includes(hitLine.serial)) throw new UserError(`La unidad ${hitLine.serial} ya está escaneada.`);
+  const current = line[field];
   const max = field === "prepared" ? line.quantity : line.quantity - line.damaged - line.lost;
   if (current >= max) throw new UserError(`${line.name}: ya están las ${line.quantity} unidades.`);
-  await tx
-    .update(pickListLines)
-    .set({ [field]: current + 1, scannedUnits: hit.serial ? [...line.scannedUnits, hit.serial] : line.scannedUnits })
-    .where(eq(pickListLines.id, line.id));
+  const scannedUnits = hitLine.serial ? [...line.scannedUnits, hitLine.serial] : line.scannedUnits;
+  await tx.update(pickListLines).set({ [field]: current + 1, scannedUnits }).where(eq(pickListLines.id, line.id));
   await refreshStatuses(tx, listId);
   revalidatePath(`/app/almacen/${listId}`);
-  return { name: line.name, serial: hit.serial, count: current + 1, quantity: line.quantity };
+  return {
+    message: `${line.name}${hitLine.serial ? ` · ${hitLine.serial}` : ""} (${current + 1}/${line.quantity})`,
+    field,
+    lines: [{ id: line.id, count: current + 1, scannedUnits }],
+    warnings: [] as string[],
+  };
 });
 
 export const markLoaded = tenantAction(z.object({ listId: id }), "almacen", async ({ listId }, tx, ctx) => {

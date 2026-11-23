@@ -28,6 +28,7 @@ export type ItemFormValues = {
   description: string | null;
   inspectionIntervalDays: number | null;
   active: boolean;
+  container?: "caja" | "conjunto" | null;
 };
 
 const EMPTY: ItemFormValues = { id: null, sku: "", name: "", category: "General", kind: "granel", unit: "ud", role: "otro", roleAmount: 1, weightKg: 0, volumeM3: 0, price: 0, priceMode: "unidad", costPrice: 0, replacementCost: 0, stockTotal: 0, location: null, description: null, inspectionIntervalDays: null, active: true };
@@ -129,6 +130,21 @@ export function ItemSheet({ open, onOpenChange, initial }: { open: boolean; onOp
         </Field>
         <Field label="Revisión cada (días)" htmlFor="it-insp">
           <Input id="it-insp" type="number" min={0} value={v.inspectionIntervalDays ?? ""} onChange={(e) => setV({ ...v, inspectionIntervalDays: e.target.value ? Number(e.target.value) : null })} />
+        </Field>
+        <Field label="Contenedor" htmlFor="it-cont" className="col-span-2" hint="Una caja de transporte o un conjunto fijo puede llevar dentro otras unidades: al escanearlo se cuenta todo su contenido">
+          <NativeSelect
+            id="it-cont"
+            value={v.container ?? ""}
+            onChange={(e) => {
+              const container = (e.target.value || null) as ItemFormValues["container"];
+              // cases and sets are tracked unit by unit
+              setV((x) => ({ ...x, container, kind: container ? "seriado" : x.kind }));
+            }}
+          >
+            <option value="">No, es un artículo normal</option>
+            <option value="caja">Caja de transporte (flight case, baúl…)</option>
+            <option value="conjunto">Conjunto (p. ej. micro + receptor + baterías)</option>
+          </NativeSelect>
         </Field>
         <Field label="Descripción" htmlFor="it-desc" className="col-span-2">
           <Textarea id="it-desc" value={v.description ?? ""} onChange={set("description")} />

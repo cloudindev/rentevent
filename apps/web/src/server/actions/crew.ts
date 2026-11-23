@@ -1,6 +1,8 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { normalizeCode, unitWhere } from "../warehouse/logic";
+import { findUnitByCode, unitDetail } from "../warehouse/tracking";
 import {
   and,
   assignments,
@@ -10,7 +12,6 @@ import {
   inArray,
   isNull,
   items,
-  itemUnits,
   jobReports,
   lt,
   shifts,
@@ -378,18 +379,27 @@ export const submitJobReport = tenantAction(
 export async function lookupQr(code: string) {
   const ctx = await getAppContext();
   if (!ctx) return { ok: false as const, error: "Sesión caducada" };
-  const c = z.string().trim().min(2).max(120).safeParse(code);
+  const c = z.string().trim().min(2).max(300).safeParse(code);
   if (!c.success) return { ok: false as const, error: "Código no válido" };
   return withTenant(ctx.tenantId, async (tx) => {
-    const [row] = await tx
-      .select({ unit: itemUnits, item: { id: items.id, name: items.name, sku: items.sku, category: items.category, location: items.location } })
-      .from(itemUnits)
-      .innerJoin(items, eq(items.id, itemUnits.itemId))
-      .where(eq(itemUnits.qrCode, c.data));
-    if (row) return { ok: true as const, kind: "unidad" as const, unit: { id: row.unit.id, serial: row.unit.serial, status: row.unit.status, qrCode: row.unit.qrCode }, item: row.item };
-    const [item] = await tx.select({ id: items.id, name: items.name, sku: items.sku, category: items.category, location: items.location }).from(items).where(eq(items.sku, c.data));
-    if (item) return { ok: true as const, kind: "articulo" as const, unit: null, item };
-    return { ok: false as const, error: `No hay ningún artículo con el código ${c.data}` };
+    const hit = await findUnitByCode(tx, c.data);
+    if (hit) {
+      const d = await unitDetail(tx, hit.unit.id);
+      const where = d ? unitWhere({ status: d.unit.status, parent: d.parent, order: d.order, warehouseName: d.warehouseName, shelf: d.shelf }) : null;
+      const contents = d?.item.container ? [...d.children.map((x) => `${x.name} ${x.serial}`), ...d.bulk.map((b) => `${b.name} × ${b.quantity}`)] : null;
+      return {
+        ok: true as const,
+        kind: "unidad" as const,
+        unit: { id: hit.unit.id, serial: hit.unit.serial, status: hit.unit.status, qrCode: hit.unit.qrCode },
+        item: { id: hit.item.id, name: hit.item.name, sku: hit.item.sku, location: hit.item.location, container: hit.item.container },
+        where,
+        contents,
+      };
+    }
+    const sku = normalizeCode(c.data);
+    const [item] = await tx.select({ id: items.id, name: items.name, sku: items.sku, location: items.location, container: items.container }).from(items).where(eq(items.sku, sku));
+    if (item) return { ok: true as const, kind: "articulo" as const, unit: null, item, where: item.location ? `Ubicación ${item.location}` : null, contents: null };
+    return { ok: false as const, error: `No hay ningún artículo con el código ${sku}` };
   });
 }
 

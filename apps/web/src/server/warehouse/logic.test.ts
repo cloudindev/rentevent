@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aggregateMaterial, clampCount, compareLocation, deliveryNoteNumber, groupByLocation, inspectionDue, lineStatus, listStatus, matchScan, progress, settleReturn } from "./logic";
+import { aggregateMaterial, clampCount, compareLocation, containerScanPlan, deliveryNoteNumber, expandContainer, groupByLocation, inspectionDue, labelUrl, lineStatus, listStatus, matchScan, normalizeCode, progress, settleReturn, wouldCycle } from "./logic";
 
 const L = (q: number, p = 0, lo = 0, r = 0, d = 0, x = 0) => ({ quantity: q, prepared: p, loaded: lo, returned: r, damaged: d, lost: x });
 
@@ -81,5 +81,65 @@ describe("inspections", () => {
   });
   it("numbers delivery notes", () => {
     expect(deliveryNoteNumber(2026, 7)).toBe("ALB-2026-0007");
+  });
+});
+
+describe("serial tracking", () => {
+  it("reads raw codes and label URLs", () => {
+    expect(normalizeCode(" RV-MIC-001 ")).toBe("RV-MIC-001");
+    expect(normalizeCode("https://rentevent.es/q/RV-MIC-001")).toBe("RV-MIC-001");
+    expect(normalizeCode("https://x.rentevent.es/q/RV%20A?x=1")).toBe("RV A");
+    expect(labelUrl("https://rentevent.es/", "RV A")).toBe("https://rentevent.es/q/RV%20A");
+    expect(normalizeCode(labelUrl("https://rentevent.es", "RV-FC-001"))).toBe("RV-FC-001");
+  });
+
+  const U = (id: string, itemId: string, parent: string | null) => ({ id, itemId, serial: id.toUpperCase(), parentUnitId: parent });
+  // case → 2 sets → mic + receiver each; batteries as bulk in each set; cables in the case
+  const units = [U("fc", "case", null), U("s1", "set", "fc"), U("s2", "set", "fc"), U("m1", "mic", "s1"), U("r1", "rec", "s1"), U("m2", "mic", "s2"), U("r2", "rec", "s2"), U("loose", "mic", null)];
+  const contents = [
+    { containerUnitId: "s1", itemId: "bat", quantity: 2 },
+    { containerUnitId: "s2", itemId: "bat", quantity: 2 },
+    { containerUnitId: "fc", itemId: "xlr", quantity: 4 },
+  ];
+
+  it("expands nested cases and sets", () => {
+    const e = expandContainer("fc", units, contents);
+    expect(e.units.map((u) => u.id).sort()).toEqual(["m1", "m2", "r1", "r2", "s1", "s2"]);
+    expect(e.bulk.sort((a, b) => a.itemId.localeCompare(b.itemId))).toEqual([
+      { itemId: "bat", quantity: 4 },
+      { itemId: "xlr", quantity: 4 },
+    ]);
+    expect(expandContainer("s1", units, contents).units.map((u) => u.id).sort()).toEqual(["m1", "r1"]);
+    expect(expandContainer("fc", units, contents, 1).units.map((u) => u.id).sort()).toEqual(["s1", "s2"]);
+  });
+
+  it("survives cycles and detects them before packing", () => {
+    const loop = [U("a", "case", "b"), U("b", "case", "a")];
+    expect(expandContainer("a", loop, []).units.map((u) => u.id)).toEqual(["b"]);
+    const parentOf = new Map(units.map((u) => [u.id, u.parentUnitId]));
+    expect(wouldCycle("fc", "m1", parentOf)).toBe(true); // putting the case inside its own mic
+    expect(wouldCycle("fc", "fc", parentOf)).toBe(true);
+    expect(wouldCycle("loose", "s1", parentOf)).toBe(false);
+  });
+
+  it("applies a whole case to a pick list, capped per line", () => {
+    const line = (id: string, itemId: string, quantity: number, extra: Partial<{ prepared: number; returned: number; damaged: number; scannedUnits: string[] }> = {}) => ({ id, itemId, quantity, prepared: 0, returned: 0, damaged: 0, lost: 0, scannedUnits: [], ...extra });
+    const e = expandContainer("fc", units, contents);
+    const found = { units: e.units, bulk: e.bulk };
+    const plan = containerScanPlan([line("lm", "mic", 2, { prepared: 1, scannedUnits: ["M1"] }), line("lr", "rec", 1), line("lb", "bat", 10)], "salida", found);
+    expect(plan.field).toBe("prepared");
+    expect(plan.updates.find((u) => u.lineId === "lm")).toEqual({ lineId: "lm", count: 2, serials: ["M1", "M2"] });
+    expect(plan.updates.find((u) => u.lineId === "lr")).toEqual({ lineId: "lr", count: 1, serials: ["R1"] });
+    expect(plan.updates.find((u) => u.lineId === "lb")?.count).toBe(4);
+    expect(plan.added).toBe(1 + 1 + 4);
+    expect(plan.skipped).toEqual(
+      expect.arrayContaining([
+        { itemId: "rec", serial: "R2", reason: "completo" },
+        { itemId: "set", serial: "S1", reason: "no_en_lista" },
+        { itemId: "xlr", serial: null, reason: "no_en_lista" },
+      ]),
+    );
+    const back = containerScanPlan([line("lm", "mic", 2, { damaged: 1 })], "retorno", { units: [{ itemId: "mic", serial: "M1" }, { itemId: "mic", serial: "M2" }], bulk: [] });
+    expect(back.updates[0]).toEqual({ lineId: "lm", count: 1, serials: ["M1"] });
   });
 });

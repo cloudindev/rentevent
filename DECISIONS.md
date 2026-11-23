@@ -38,3 +38,14 @@ Cada línea: decisión — motivo. Los valores marcados **[SUPUESTO]** son datos
 - Sesión con caché en cookie firmada de 2 minutos (Better Auth `cookieCache`): evita consultar sesión y usuario en cada navegación. Una sesión revocada sigue válida como máximo 2 minutos.
 - Contexto de la app: pertenencias y ajustes de empresa en una sola consulta.
 - Caché del router del cliente `staleTimes.dynamic = 30`: volver a una vista visitada hace menos de 30 s es instantáneo; las acciones que modifican datos la refrescan.
+
+## Seguimiento por número de serie, cajas y conjuntos
+
+- **Una unidad = una fila de `item_units`** con su número de serie, su código QR, su estado y, ahora, su ubicación propia (`warehouse_id`, `location`; si están vacías se usa la del artículo), el pedido en el que está fuera (`current_order_id`) y la caja o conjunto que la contiene (`parent_unit_id`).
+- **Cajas y conjuntos son artículos normales marcados con `items.container`** (`caja` o `conjunto`). Sus unidades pueden contener otras unidades (anidables: conjuntos dentro de una caja) y material sin número de serie (`unit_contents`: pilas, cables…). No se alquilan por sí mismos: el cliente pide micrófonos (o un kit comercial), y la caja es solo cómo viajan.
+- **Escanear una caja en una lista de almacén cuenta todo su contenido** a la vez, con tope por línea. En la carga solo valen unidades disponibles; en el retorno, solo las que salieron en ese pedido. Lo que no está en el pedido o ya está completo se avisa y no se suma.
+- **Retornos por número de serie**: vuelven las unidades escaneadas; si la línea se contó a mano, vuelven tantas como se indiquen (de las de ese pedido, no de otros). De las que faltan, las marcadas como perdidas pasan a «perdida» y las dañadas a reparación; el resto sigue fuera con su pedido. Antes se marcaban disponibles todas las unidades «en obra» del artículo, aunque estuvieran en otro evento.
+- **Una unidad que viaja sin su caja deja de estar dentro de ella** (se desempaqueta sola y queda en el historial), para que «dónde está» sea siempre cierto.
+- **Historial por unidad en `unit_events`**, separado de `movements` (que sigue siendo el libro de stock por artículo y no debe duplicarse): alta, salidas, vueltas, daños, pérdidas, reparaciones, revisiones, traslados y empaquetado.
+- **Las etiquetas QR codifican una URL** (`APP_URL/q/<código>`): con la cámara de cualquier móvil se abre la ficha de la unidad (tras iniciar sesión), y los escáneres de la app aceptan tanto la URL como el código. El código guardado no cambia, así que las etiquetas ya pegadas siguen valiendo. Hoja PDF A4 de 3 × 8 etiquetas de 70 × 37 mm.
+- La demo incluye micrófonos inalámbricos en conjuntos (micro + receptor + 2 pilas) dentro de dos flight cases con cables XLR; `pnpm --filter @rentevent/db tsx scripts/seed-tracking.ts [tenantId]` la añade a una empresa existente.

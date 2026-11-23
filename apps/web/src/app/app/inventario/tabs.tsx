@@ -5,6 +5,7 @@ export function InventoryTabs() {
     <SectionTabs
       tabs={[
         { href: "/app/inventario", label: "Artículos", exact: true },
+        { href: "/app/inventario/unidades", label: "Unidades" },
         { href: "/app/inventario/kits", label: "Kits" },
       ]}
     />

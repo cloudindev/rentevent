@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import QRCode from "qrcode";
 import { Boxes } from "lucide-react";
 import { addDays, dayKey } from "@rentevent/core";
-import { asc, desc, eq, inspections, itemUnits, items, movements, repairs } from "@rentevent/db";
+import Link from "next/link";
+import { asc, desc, eq, inArray, inspections, itemUnits, items, movements, orders, repairs, warehouses } from "@rentevent/db";
 import { PageBody, PageHeader } from "@/components/app/page-header";
 import { ItemTimeline } from "@/components/app/item-timeline";
 import { StatusPill } from "@/components/ui/badge";
@@ -13,9 +14,11 @@ import { formatDate, formatDateTime, formatEUR, formatNumber } from "@/lib/utils
 import { tenantDb } from "@/server/context";
 import { buildTimeline } from "@/server/timeline";
 import { ItemActions } from "./item-actions";
+import { Printer } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { CONTAINER_LABEL, UNIT_STATUS_LABEL, UNIT_STATUS_TONE, unitWhere } from "@/server/warehouse/logic";
 import { now } from "@/lib/now";
 
-const UNIT_TONE = { disponible: "success", en_obra: "info", reparacion: "warning", limpieza: "warning", baja: "neutral" } as const;
 const MOVE_LABEL: Record<string, string> = { salida: "Salida", retorno: "Retorno", dano: "Daño", perdida: "Pérdida", ajuste: "Ajuste", reparacion_alta: "A reparación", reparacion_baja: "Reparado" };
 
 export default async function ItemPage({ params }: { params: Promise<{ id: string }> }) {
@@ -31,7 +34,14 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
       tx.select().from(inspections).where(eq(inspections.itemId, id)).orderBy(desc(inspections.inspectedAt)).limit(20),
       buildTimeline(tx, id, today, addDays(today, 27), { withDates: true }),
     ]);
-    return { item, units, moves, reps, insps, timeline, role: ctx.role };
+    const orderIds = [...new Set(units.map((u) => u.currentOrderId).filter((x): x is string => Boolean(x)))];
+    const parentIds = [...new Set(units.map((u) => u.parentUnitId).filter((x): x is string => Boolean(x)))];
+    const [ords, parents, whs] = await Promise.all([
+      orderIds.length ? tx.select({ id: orders.id, number: orders.number, title: orders.title }).from(orders).where(inArray(orders.id, orderIds)) : [],
+      parentIds.length ? tx.select({ id: itemUnits.id, serial: itemUnits.serial, name: items.name }).from(itemUnits).innerJoin(items, eq(items.id, itemUnits.itemId)).where(inArray(itemUnits.id, parentIds)) : [],
+      tx.select({ id: warehouses.id, name: warehouses.name }).from(warehouses),
+    ]);
+    return { item, units, moves, reps, insps, timeline, ords, parents, whs, role: ctx.role };
   });
   if (!data) notFound();
   const { item } = data;
@@ -64,6 +74,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
             description: item.description,
             inspectionIntervalDays: item.inspectionIntervalDays,
             active: item.active,
+            container: item.container as "caja" | "conjunto" | null,
           }}
         />
       </PageHeader>
@@ -136,7 +147,18 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
         </div>
         {(item.kind === "seriado" || data.units.length > 0) && (
           <section className="space-y-3">
-            <h2 className="text-sm font-semibold">Unidades seriadas ({data.units.length})</h2>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold">
+                Unidades seriadas ({data.units.length}){item.container && <span className="ml-2 font-normal text-muted-foreground">· {CONTAINER_LABEL[item.container]}</span>}
+              </h2>
+              {data.units.length > 0 && (
+                <Button asChild variant="outline" size="sm">
+                  <a href={`/app/inventario/etiquetas?item=${item.id}`} target="_blank" rel="noreferrer">
+                    <Printer /> Imprimir etiquetas QR
+                  </a>
+                </Button>
+              )}
+            </div>
             <Table>
               <THead>
                 <TR>
@@ -144,6 +166,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                   <TH>Número de serie</TH>
                   <TH>Código</TH>
                   <TH>Estado</TH>
+                  <TH>Dónde está</TH>
                   <TH>Última revisión</TH>
                 </TR>
               </THead>
@@ -151,10 +174,23 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                 {data.units.map((u, i) => (
                   <TR key={u.id}>
                     <TD>{qrs[i] ? <img src={qrs[i]} alt={`QR ${u.qrCode}`} className="size-12 rounded border bg-white p-0.5" /> : null}</TD>
-                    <TD className="font-medium">{u.serial}</TD>
+                    <TD className="font-medium">
+                      <Link href={`/app/inventario/unidades/${u.id}`} className="hover:underline">
+                        {u.serial}
+                      </Link>
+                    </TD>
                     <TD className="font-mono text-xs">{u.qrCode}</TD>
                     <TD>
-                      <StatusPill tone={UNIT_TONE[u.status as keyof typeof UNIT_TONE] ?? "neutral"}>{u.status.replace("_", " ")}</StatusPill>
+                      <StatusPill tone={UNIT_STATUS_TONE[u.status] ?? "neutral"}>{UNIT_STATUS_LABEL[u.status] ?? u.status}</StatusPill>
+                    </TD>
+                    <TD className="text-sm">
+                      {unitWhere({
+                        status: u.status,
+                        parent: data.parents.find((p) => p.id === u.parentUnitId) ?? null,
+                        order: data.ords.find((o) => o.id === u.currentOrderId) ?? null,
+                        warehouseName: data.whs.find((w) => w.id === (u.warehouseId ?? item.warehouseId))?.name ?? null,
+                        shelf: u.location ?? item.location,
+                      })}
                     </TD>
                     <TD>{formatDate(u.lastInspectionAt)}</TD>
                   </TR>

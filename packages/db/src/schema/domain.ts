@@ -13,6 +13,7 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { organization, user } from "./auth";
 
@@ -300,6 +301,8 @@ export const items = pgTable(
     active: boolean("active").notNull().default(true),
     pendingValidation: boolean("pending_validation").notNull().default(false),
     inspectionIntervalDays: integer("inspection_interval_days"),
+    /** null | "caja" (flight case / transport box) | "conjunto" (fixed set, e.g. mic + receiver + batteries) */
+    container: text("container"),
   },
   (t) => [uniqueIndex("items_sku_idx").on(t.tenantId, t.sku)],
 );
@@ -317,8 +320,49 @@ export const itemUnits = pgTable(
     purchasedAt: date("purchased_at"),
     lastInspectionAt: ts("last_inspection_at"),
     notes: text("notes"),
+    /** where it sits when in the warehouse (falls back to the item's location) */
+    warehouseId: uuid("warehouse_id").references(() => warehouses.id, { onDelete: "set null" }),
+    location: text("location"),
+    /** case or set this unit is packed in */
+    parentUnitId: uuid("parent_unit_id").references((): AnyPgColumn => itemUnits.id, { onDelete: "set null" }),
+    /** order it is out on (status en_obra) */
+    currentOrderId: uuid("current_order_id").references((): AnyPgColumn => orders.id, { onDelete: "set null" }),
+    lastSeenAt: ts("last_seen_at"),
   },
-  (t) => [uniqueIndex("item_units_qr_idx").on(t.tenantId, t.qrCode)],
+  (t) => [uniqueIndex("item_units_qr_idx").on(t.tenantId, t.qrCode), index("item_units_parent_idx").on(t.tenantId, t.parentUnitId), index("item_units_order_idx").on(t.tenantId, t.currentOrderId)],
+);
+
+/** Bulk (non-serialised) contents of a case or set, e.g. 2 AA batteries, 4 XLR cables. */
+export const unitContents = pgTable(
+  "unit_contents",
+  {
+    ...base(),
+    containerUnitId: uuid("container_unit_id")
+      .notNull()
+      .references(() => itemUnits.id, { onDelete: "cascade" }),
+    itemId: uuid("item_id")
+      .notNull()
+      .references(() => items.id, { onDelete: "cascade" }),
+    quantity: qty("quantity").notNull(),
+  },
+  (t) => [uniqueIndex("unit_contents_idx").on(t.tenantId, t.containerUnitId, t.itemId)],
+);
+
+/** Per-unit history: what happened to one serial number, when and where. */
+export const unitEvents = pgTable(
+  "unit_events",
+  {
+    ...base(),
+    unitId: uuid("unit_id")
+      .notNull()
+      .references(() => itemUnits.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    orderId: uuid("order_id").references((): AnyPgColumn => orders.id, { onDelete: "set null" }),
+    note: text("note"),
+    userId: text("user_id"),
+    userName: text("user_name"),
+  },
+  (t) => [index("unit_events_unit_idx").on(t.tenantId, t.unitId, t.createdAt)],
 );
 
 export const kits = pgTable("kits", {
@@ -807,6 +851,8 @@ export const pickLists = pgTable("pick_lists", {
   kind: text("kind").notNull().default("salida"),
   status: text("status").notNull().default("por_preparar"),
   dueAt: ts("due_at"),
+  /** ids of cases/sets scanned as a whole on this list */
+  scannedContainers: text("scanned_containers").array().notNull().default(sql`'{}'::text[]`),
 });
 
 export const pickListLines = pgTable("pick_list_lines", {

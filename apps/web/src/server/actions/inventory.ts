@@ -5,6 +5,8 @@ import { eq, itemUnits, items, kitItems, kits, movements, stockCounts } from "@r
 import { PART_ROLES } from "@rentevent/core";
 import { audit, diffOf } from "../audit";
 import { tenantAction, UserError } from "../action";
+import { UNIT_STATUS_LABEL } from "../warehouse/logic";
+import { logUnitEvents, moveUnit as moveUnitSvc, packUnit as packUnitSvc, setBulkContent as setBulkSvc, unpackUnit as unpackUnitSvc } from "../warehouse/tracking";
 
 const itemInput = z.object({
   id: z.string().uuid().nullable(),
@@ -29,6 +31,8 @@ const itemInput = z.object({
   description: z.string().trim().max(1000).nullable(),
   inspectionIntervalDays: z.coerce.number().int().min(0).nullable(),
   active: z.boolean().default(true),
+  // optional: forms that do not show it must not reset it
+  container: z.enum(["caja", "conjunto"]).nullable().optional(),
 });
 
 export const saveItem = tenantAction(itemInput, "inventario", async (input, tx, ctx) => {
@@ -79,7 +83,8 @@ export const addUnits = tenantAction(z.object({ itemId: z.string().uuid(), count
     const serial = `${it.sku}-${String(n).padStart(3, "0")}`;
     return { itemId, serial, qrCode: `RV-${serial}` };
   });
-  await tx.insert(itemUnits).values(rows).onConflictDoNothing();
+  const created = await tx.insert(itemUnits).values(rows).onConflictDoNothing().returning({ id: itemUnits.id });
+  await logUnitEvents(tx, ctx, created.map((u) => u.id), "alta", { note: "Unidad dada de alta" });
   if (it.kind !== "seriado") await tx.update(items).set({ kind: "seriado" }).where(eq(items.id, itemId));
   await audit(tx, ctx, "item", itemId, "editar", { unidadesSeriadas: count });
   revalidatePath(`/app/inventario/${itemId}`);
@@ -87,13 +92,18 @@ export const addUnits = tenantAction(z.object({ itemId: z.string().uuid(), count
 });
 
 export const setUnitStatus = tenantAction(
-  z.object({ id: z.string().uuid(), status: z.enum(["disponible", "en_obra", "reparacion", "limpieza", "baja"]) }),
+  z.object({ id: z.string().uuid(), status: z.enum(["disponible", "reparacion", "limpieza", "baja", "perdida"]) }),
   "inventario",
   async ({ id, status }, tx, ctx) => {
-    const [u] = await tx.update(itemUnits).set({ status }).where(eq(itemUnits.id, id)).returning();
-    if (!u) throw new UserError("Unidad no encontrada");
+    const [before] = await tx.select().from(itemUnits).where(eq(itemUnits.id, id));
+    if (!before) throw new UserError("Unidad no encontrada");
+    if (before.status === status) return { id };
+    // back in the warehouse (or written off) means it is no longer out on an order
+    const [u] = await tx.update(itemUnits).set({ status, currentOrderId: status === "perdida" ? before.currentOrderId : null }).where(eq(itemUnits.id, id)).returning();
+    await logUnitEvents(tx, ctx, [id], "estado", { note: `${UNIT_STATUS_LABEL[before.status] ?? before.status} → ${UNIT_STATUS_LABEL[status]}` });
     await audit(tx, ctx, "item_unit", id, "estado", { status });
-    revalidatePath(`/app/inventario/${u.itemId}`);
+    revalidatePath(`/app/inventario/${u!.itemId}`);
+    revalidatePath(`/app/inventario/unidades/${id}`);
     return { id };
   },
 );
@@ -132,4 +142,52 @@ export const recordCount = tenantAction(z.object({ itemId: z.string().uuid(), co
   await audit(tx, ctx, "item", input.itemId, "editar", { recuento: input.counted });
   revalidatePath(`/app/inventario/${input.itemId}`);
   return { diff: input.counted - Number(it.stockTotal) };
+});
+
+// ───────────── Cases, sets and unit location ─────────────
+
+const revalidateUnit = (...ids: (string | null | undefined)[]) => {
+  for (const id of ids) if (id) revalidatePath(`/app/inventario/unidades/${id}`);
+  revalidatePath("/app/inventario/unidades");
+};
+
+export const packUnit = tenantAction(z.object({ containerId: z.string().uuid(), code: z.string().trim().min(1, "Escribe o escanea un código").max(300) }), "almacen", async ({ containerId, code }, tx, ctx) => {
+  const r = await packUnitSvc(tx, ctx, containerId, code);
+  revalidateUnit(containerId);
+  return r;
+});
+
+export const unpackUnit = tenantAction(z.object({ unitId: z.string().uuid() }), "almacen", async ({ unitId }, tx, ctx) => {
+  const r = await unpackUnitSvc(tx, ctx, unitId);
+  revalidateUnit(unitId, r.containerId);
+  return r;
+});
+
+export const setUnitContent = tenantAction(
+  z.object({ containerId: z.string().uuid(), itemId: z.string().uuid(), quantity: z.coerce.number().min(0).max(10_000) }),
+  "almacen",
+  async ({ containerId, itemId, quantity }, tx, ctx) => {
+    await setBulkSvc(tx, ctx, containerId, itemId, quantity);
+    revalidateUnit(containerId);
+    return { ok: true };
+  },
+);
+
+export const moveUnit = tenantAction(
+  z.object({ unitId: z.string().uuid(), warehouseId: z.string().uuid().nullable(), location: z.string().trim().max(40).nullable() }),
+  "almacen",
+  async ({ unitId, warehouseId, location }, tx, ctx) => {
+    await moveUnitSvc(tx, ctx, unitId, warehouseId, location || null);
+    revalidateUnit(unitId);
+    return { ok: true };
+  },
+);
+
+export const saveUnitNotes = tenantAction(z.object({ unitId: z.string().uuid(), serial: z.string().trim().min(1, "Obligatorio").max(60), notes: z.string().trim().max(1000).nullable() }), "inventario", async ({ unitId, serial, notes }, tx, ctx) => {
+  const [u] = await tx.update(itemUnits).set({ serial, notes: notes || null }).where(eq(itemUnits.id, unitId)).returning({ itemId: itemUnits.itemId });
+  if (!u) throw new UserError("Unidad no encontrada");
+  await audit(tx, ctx, "item_unit", unitId, "editar", { serial, notes });
+  revalidateUnit(unitId);
+  revalidatePath(`/app/inventario/${u.itemId}`);
+  return { ok: true };
 });

@@ -1,10 +1,11 @@
 import "server-only";
-import { and, asc, contacts, eq, inArray, itemUnits, items, movements, orderLines, orders, pickListLines, pickLists, projects, repairs, sql, type Tx } from "@rentevent/db";
+import { and, asc, contacts, eq, inArray, isNotNull, isNull, itemUnits, items, or, movements, orderLines, orders, pickListLines, pickLists, projects, repairs, sql, type Tx } from "@rentevent/db";
 import { syncReservations } from "@rentevent/db/services";
 import { UserError } from "../action";
 import { audit } from "../audit";
 import type { AppContext } from "../context";
 import { aggregateMaterial, compareLocation, lineStatus, listStatus, type PickKind } from "./logic";
+import { detachStrays, logUnitEvents } from "./tracking";
 
 type Ctx = Pick<AppContext, "user">;
 
@@ -110,13 +111,22 @@ export async function markLoaded(tx: Tx, ctx: Ctx, listId: string) {
   if (data.list.status === "en_obra") throw new UserError("Esta carga ya está registrada.");
   const loaded = data.lines.filter((l) => l.loaded > 0 || l.prepared > 0);
   if (loaded.length === 0) throw new UserError("No hay nada preparado ni cargado.");
+  const unitIds: string[] = [];
   for (const l of data.lines) {
     const q = l.loaded > 0 ? l.loaded : l.prepared;
     if (l.loaded < q) await tx.update(pickListLines).set({ loaded: q }).where(eq(pickListLines.id, l.id));
     if (q > 0) await tx.insert(movements).values({ itemId: l.itemId, orderId: data.list.orderId, kind: "salida", quantity: -q, userId: ctx.user.id, note: `Carga pedido ${data.order?.number ?? ""}` });
     if (l.scannedUnits.length) {
-      await tx.update(itemUnits).set({ status: "en_obra" }).where(and(eq(itemUnits.itemId, l.itemId), inArray(itemUnits.serial, l.scannedUnits)));
+      const out = await tx.select({ id: itemUnits.id }).from(itemUnits).where(and(eq(itemUnits.itemId, l.itemId), inArray(itemUnits.serial, l.scannedUnits)));
+      unitIds.push(...out.map((u) => u.id));
     }
+  }
+  // serial units and the cases/sets they travel in leave with this order
+  unitIds.push(...data.list.scannedContainers);
+  if (unitIds.length) {
+    await tx.update(itemUnits).set({ status: "en_obra", currentOrderId: data.list.orderId, lastSeenAt: new Date() }).where(inArray(itemUnits.id, unitIds));
+    await logUnitEvents(tx, ctx, unitIds, "salida", { orderId: data.list.orderId, note: `Carga pedido ${data.order?.number ?? ""}` });
+    await detachStrays(tx, ctx, unitIds);
   }
   await tx.update(pickLists).set({ status: "en_obra" }).where(eq(pickLists.id, listId));
   await tx.update(pickListLines).set({ status: "en_obra" }).where(eq(pickListLines.pickListId, listId));
@@ -141,6 +151,11 @@ export async function closeReturn(tx: Tx, ctx: Ctx, listId: string, input: Retur
   if (data.list.status === "devuelto") throw new UserError("Este retorno ya está cerrado.");
   const orderNo = data.order?.number ?? "";
   let repairsCreated = 0;
+  // serials that left on the outgoing list (for units loaded before per-order tracking existed)
+  const [outList] = await tx.select({ id: pickLists.id }).from(pickLists).where(and(eq(pickLists.orderId, data.list.orderId), eq(pickLists.kind, "salida")));
+  const outLines = outList ? await tx.select({ itemId: pickListLines.itemId, scannedUnits: pickListLines.scannedUnits }).from(pickListLines).where(eq(pickListLines.pickListId, outList.id)) : [];
+  const outSerials = new Map(outLines.map((l) => [l.itemId, l.scannedUnits]));
+  const settled: string[] = [];
   for (const l of data.lines) {
     const i = input.find((x) => x.lineId === l.id) ?? { lineId: l.id, returned: l.returned, damaged: l.damaged, lost: l.lost, dirty: false };
     const returned = Math.max(0, Math.min(i.returned, l.quantity));
@@ -166,10 +181,23 @@ export async function closeReturn(tx: Tx, ctx: Ctx, listId: string, input: Retur
       await tx.insert(movements).values({ itemId: l.itemId, orderId: data.list.orderId, kind: "perdida", quantity: -lost, userId: ctx.user.id, note: `Perdido en pedido ${orderNo}` });
       await tx.update(items).set({ stockTotal: sql`greatest(0, ${items.stockTotal} - ${lost})` }).where(eq(items.id, l.itemId));
     }
-    if (l.scannedUnits.length || returned > 0) {
-      await tx.update(itemUnits).set({ status: "disponible" }).where(and(eq(itemUnits.itemId, l.itemId), eq(itemUnits.status, "en_obra")));
-    }
+    settled.push(...(await settleUnits(tx, ctx, data.list.orderId, orderNo, l, { returned, damaged, lost }, outSerials.get(l.itemId) ?? [])));
   }
+  // cases/sets: scanned back → in the warehouse; with no scanning at all, the counts decide
+  const outContainers = await tx
+    .select({ id: itemUnits.id })
+    .from(itemUnits)
+    .innerJoin(items, eq(items.id, itemUnits.itemId))
+    .where(and(eq(itemUnits.currentOrderId, data.list.orderId), eq(itemUnits.status, "en_obra"), isNotNull(items.container)));
+  const noScans = data.list.scannedContainers.length === 0 && data.lines.every((l) => l.scannedUnits.length === 0);
+  const backContainers = outContainers.map((c) => c.id).filter((id) => noScans || data.list.scannedContainers.includes(id));
+  if (backContainers.length) {
+    await tx.update(itemUnits).set({ status: "disponible", currentOrderId: null, lastSeenAt: new Date() }).where(inArray(itemUnits.id, backContainers));
+    await logUnitEvents(tx, ctx, backContainers, "retorno", { orderId: data.list.orderId, note: `Retorno pedido ${orderNo}` });
+  }
+  // a unit that came back without its case (or the other way round) is taken out of it
+  const stillOut = await tx.select({ id: itemUnits.id }).from(itemUnits).where(and(eq(itemUnits.currentOrderId, data.list.orderId), isNotNull(itemUnits.parentUnitId)));
+  await detachStrays(tx, ctx, [...settled, ...backContainers, ...stillOut.map((u) => u.id)]);
   const pending = data.lines.some((l) => {
     const i = input.find((x) => x.lineId === l.id);
     const acc = (i?.returned ?? 0) + (i?.damaged ?? 0) + (i?.lost ?? 0);
@@ -182,4 +210,52 @@ export async function closeReturn(tx: Tx, ctx: Ctx, listId: string, input: Retur
   }
   await audit(tx, ctx, "pick_list", listId, "estado", { retornoCerrado: true, reparaciones: repairsCreated, pendiente: pending });
   return { repairsCreated, orderReturned: !pending };
+}
+
+/**
+ * Per-serial settlement of one return line. Scanned serials are back; when the
+ * line was counted by hand, that many of the order's units are. Of the rest,
+ * `lost` become lost and `damaged` go to repair; anything left stays out on the order.
+ */
+async function settleUnits(
+  tx: Tx,
+  ctx: Ctx,
+  orderId: string,
+  orderNo: string,
+  line: { itemId: string; scannedUnits: string[] },
+  counts: { returned: number; damaged: number; lost: number },
+  outSerials: string[],
+) {
+  const mine = await tx
+    .select({ id: itemUnits.id, serial: itemUnits.serial })
+    .from(itemUnits)
+    .where(
+      and(
+        eq(itemUnits.itemId, line.itemId),
+        eq(itemUnits.status, "en_obra"),
+        or(eq(itemUnits.currentOrderId, orderId), outSerials.length ? and(isNull(itemUnits.currentOrderId), inArray(itemUnits.serial, outSerials)) : undefined),
+      ),
+    )
+    .orderBy(asc(itemUnits.serial));
+  if (!mine.length) return [];
+  const back = line.scannedUnits.length ? mine.filter((u) => line.scannedUnits.includes(u.serial)) : mine.slice(0, counts.returned);
+  const rest = mine.filter((u) => !back.includes(u));
+  const lostU = rest.slice(0, counts.lost);
+  const damagedU = rest.slice(counts.lost, counts.lost + counts.damaged);
+  const now = new Date();
+  const ids = (xs: { id: string }[]) => xs.map((x) => x.id);
+  if (back.length) {
+    await tx.update(itemUnits).set({ status: "disponible", currentOrderId: null, lastSeenAt: now }).where(inArray(itemUnits.id, ids(back)));
+    await logUnitEvents(tx, ctx, ids(back), "retorno", { orderId, note: `Retorno pedido ${orderNo}` });
+  }
+  if (damagedU.length) {
+    await tx.update(itemUnits).set({ status: "reparacion", currentOrderId: null, lastSeenAt: now }).where(inArray(itemUnits.id, ids(damagedU)));
+    await logUnitEvents(tx, ctx, ids(damagedU), "danado", { orderId, note: `Dañada en el pedido ${orderNo}` });
+  }
+  if (lostU.length) {
+    // keeps currentOrderId: the order is where it was last seen
+    await tx.update(itemUnits).set({ status: "perdida" }).where(inArray(itemUnits.id, ids(lostU)));
+    await logUnitEvents(tx, ctx, ids(lostU), "perdido", { orderId, note: `No volvió del pedido ${orderNo}` });
+  }
+  return mine.map((u) => u.id);
 }

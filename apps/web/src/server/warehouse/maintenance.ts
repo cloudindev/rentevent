@@ -4,6 +4,7 @@ import { UserError } from "../action";
 import { audit } from "../audit";
 import type { AppContext } from "../context";
 import { inspectionDue, type InspectionStatus } from "./logic";
+import { logUnitEvents } from "./tracking";
 
 type Ctx = Pick<AppContext, "user">;
 const OPEN = ["pendiente", "en_curso"];
@@ -17,7 +18,10 @@ export async function openRepair(tx: Tx, ctx: Ctx, input: { itemId: string; unit
   const [r] = await tx.insert(repairs).values({ itemId: input.itemId, unitId: input.unitId ?? null, orderId: input.orderId ?? null, quantity: input.quantity, kind: input.kind, status: "pendiente", reason: input.reason }).returning({ id: repairs.id });
   await tx.update(items).set({ stockRepair: sql`${items.stockRepair} + ${input.quantity}` }).where(eq(items.id, input.itemId));
   await tx.insert(movements).values({ itemId: input.itemId, unitId: input.unitId ?? null, kind: "reparacion_alta", quantity: input.quantity, userId: ctx.user.id, note: input.kind === "limpieza" ? "A limpieza" : input.reason });
-  if (input.unitId) await tx.update(itemUnits).set({ status: input.kind === "limpieza" ? "limpieza" : "reparacion" }).where(eq(itemUnits.id, input.unitId));
+  if (input.unitId) {
+    await tx.update(itemUnits).set({ status: input.kind === "limpieza" ? "limpieza" : "reparacion", currentOrderId: null }).where(eq(itemUnits.id, input.unitId));
+    await logUnitEvents(tx, ctx, [input.unitId], input.kind, { orderId: input.orderId ?? null, note: input.reason });
+  }
   await audit(tx, ctx, "repair", r!.id, "crear", { kind: input.kind, cantidad: input.quantity });
   return r!.id;
 }
@@ -45,7 +49,10 @@ export async function setRepairStatus(tx: Tx, ctx: Ctx, input: { id: string; sta
       await tx.update(items).set({ stockTotal: sql`greatest(0, ${items.stockTotal} - ${q})` }).where(eq(items.id, r.itemId));
       await tx.insert(movements).values({ itemId: r.itemId, unitId: r.unitId, kind: "perdida", quantity: -q, userId: ctx.user.id, note: "Baja tras reparación" });
     }
-    if (r.unitId) await tx.update(itemUnits).set({ status: input.status === "baja" ? "baja" : "disponible" }).where(eq(itemUnits.id, r.unitId));
+    if (r.unitId) {
+      await tx.update(itemUnits).set({ status: input.status === "baja" ? "baja" : "disponible" }).where(eq(itemUnits.id, r.unitId));
+      await logUnitEvents(tx, ctx, [r.unitId], input.status === "baja" ? "baja" : "reparado", { note: input.resolution ?? (r.kind === "limpieza" ? "Limpieza terminada" : null) });
+    }
   }
   await audit(tx, ctx, "repair", input.id, "estado", { de: r.status, a: input.status });
 }
@@ -57,7 +64,10 @@ export async function recordInspection(tx: Tx, ctx: Ctx, input: { itemId: string
   const now = new Date();
   const nextDueAt = it.inspectionIntervalDays ? new Date(now.getTime() + it.inspectionIntervalDays * 86_400_000) : null;
   const [row] = await tx.insert(inspections).values({ itemId: input.itemId, unitId: input.unitId ?? null, kind: "revision", result: input.result, inspector: input.inspector, notes: input.notes ?? null, inspectedAt: now, nextDueAt }).returning({ id: inspections.id });
-  if (input.unitId) await tx.update(itemUnits).set({ lastInspectionAt: now }).where(eq(itemUnits.id, input.unitId));
+  if (input.unitId) {
+    await tx.update(itemUnits).set({ lastInspectionAt: now }).where(eq(itemUnits.id, input.unitId));
+    await logUnitEvents(tx, ctx, [input.unitId], "revision", { note: `${input.result === "ok" ? "Apta" : input.result === "defectos" ? "Con defectos" : "No apta"}${input.notes ? ` · ${input.notes}` : ""}` });
+  }
   let repairId: string | null = null;
   if (input.result === "no_apto") {
     repairId = await openRepair(tx, ctx, { itemId: input.itemId, unitId: input.unitId, quantity: input.quantity ?? 1, kind: "reparacion", reason: `Revisión no apta${input.notes ? `: ${input.notes}` : ""}` });
