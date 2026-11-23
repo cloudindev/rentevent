@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { aggregateDays, payrollCsv, trainingStatus, workedHours } from "./hours";
 import { buildIcs, icsToken, verifyIcsToken } from "./ics";
-import { blockPosition, madridMidnight, shiftKey, stackLanes, weekRange } from "./board";
+import { blockPosition, dayBlockPosition, madridMidnight, shiftKey, stackLanes, weekRange } from "./board";
 
 const d = (s: string) => new Date(s);
 
@@ -78,5 +78,20 @@ describe("board", () => {
       { start: 10, end: 20 },
     ]);
     expect(lanes.map((l) => l.lane)).toEqual([0, 1, 0]);
+  });
+});
+
+describe("dayBlockPosition", () => {
+  const range = weekRange("2026-11-23", "semana");
+  const at = (key: string, h: number) => madridMidnight(key) + h * 3_600_000;
+  it("fills the whole day column for a short early shift", () => {
+    expect(dayBlockPosition(at("2026-11-26", 5), at("2026-11-26", 7), range)).toEqual({ left: (3 / 7) * 100, width: (1 / 7) * 100, from: 3, to: 4 });
+  });
+  it("spans every day an overnight or multi-day shift touches", () => {
+    expect(dayBlockPosition(at("2026-11-23", 20), at("2026-11-24", 4), range)).toMatchObject({ from: 0, to: 2 });
+    expect(dayBlockPosition(at("2026-11-23", 8), at("2026-11-24", 0), range)).toMatchObject({ from: 0, to: 1 });
+  });
+  it("ignores blocks outside the week", () => {
+    expect(dayBlockPosition(at("2026-11-30", 8), at("2026-11-30", 10), range)).toBeNull();
   });
 });

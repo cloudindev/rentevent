@@ -25,7 +25,7 @@ import { Checkbox } from "@/components/ui/menu";
 import { cn, formatDate, formatTime } from "@/lib/utils";
 import { assignVehicle } from "@/server/actions/transport";
 import { assignWorker, deleteShift, publishPlanning, saveShift, suggestForShift, unassignWorker } from "@/server/actions/crew";
-import { blockPosition, DAY_WINDOW, shiftKey, stackLanes, WEEK_WINDOW, type BoardRange, type HourWindow } from "@/server/crew/board";
+import { blockPosition, dayBlockPosition, DAY_WINDOW, shiftKey, stackLanes, type BoardRange } from "@/server/crew/board";
 import { ASSIGNMENT_LABEL, ASSIGNMENT_TONE, WorkerDot } from "./bits";
 
 export type BoardShift = {
@@ -199,7 +199,7 @@ export function Board({ data }: { data: BoardData }) {
         <div className="min-h-0 flex-1 overflow-auto">
           <div className="min-w-[960px]">
             <div className="sticky top-0 z-10 flex border-b bg-background">
-              <div className="w-56 shrink-0 border-r px-4 py-2 text-xs text-muted-foreground">{data.view === "proyecto" ? "Proyecto" : "Trabajador"} <span className="text-[10px]">({data.mode === "dia" ? "05–23 h" : "06–22 h"})</span></div>
+              <div className="w-56 shrink-0 border-r px-4 py-2 text-xs text-muted-foreground">{data.view === "proyecto" ? "Proyecto" : "Trabajador"}{data.mode === "dia" && <span className="text-[10px]"> (05–23 h)</span>}</div>
               <div className="flex flex-1">
                 {data.range.days.map((d) => (
                   <div key={d.key} className="flex-1 border-r px-2 py-2 text-xs capitalize text-muted-foreground last:border-r-0">
@@ -254,7 +254,7 @@ export function Board({ data }: { data: BoardData }) {
                       }
                     >
                       {absences.map((u, i) => {
-                        const pos = blockPosition(u.start, u.end, data.range, data.mode === "dia" ? DAY_WINDOW : WEEK_WINDOW);
+                        const pos = data.mode === "dia" ? blockPosition(u.start, u.end, data.range, DAY_WINDOW) : dayBlockPosition(u.start, u.end, data.range);
                         return pos ? (
                           <div key={i} className="absolute inset-y-1 rounded-md bg-[repeating-linear-gradient(135deg,var(--muted),var(--muted)_6px,transparent_6px,transparent_12px)] text-[10px] text-muted-foreground" style={{ left: `${pos.left}%`, width: `${pos.width}%` }} title={u.reason}>
                             <span className="px-1.5">{u.reason}</span>
@@ -386,21 +386,32 @@ function Row({ label, days, children, className, highlight, dropProps }: { label
   );
 }
 
+const BLOCK_H = 40;
+const BLOCK_GAP = 4;
+
 function Blocks<T extends { start: number; end: number; key: string }>({ items, range, render }: { items: T[]; range: BoardRange; render: (s: T) => React.ReactNode }) {
-  const win: HourWindow = range.days.length === 1 ? DAY_WINDOW : WEEK_WINDOW;
-  const stacked = stackLanes(items);
-  const lanes = Math.max(1, ...stacked.map((s) => s.lane + 1));
+  const week = range.days.length > 1;
+  // week: each shift fills its day column(s), stacked by day; day: exact hours
+  const placed = items
+    .map((s) => {
+      if (week) {
+        const pos = dayBlockPosition(s.start, s.end, range);
+        return pos && { s, pos, start: pos.from, end: pos.to, sortKey: s.start };
+      }
+      const pos = blockPosition(s.start, s.end, range, DAY_WINDOW);
+      return pos && { s, pos, start: s.start, end: s.end, sortKey: s.start };
+    })
+    .filter((x) => x !== null)
+    .sort((a, b) => a.start - b.start || a.sortKey - b.sortKey);
+  const stacked = stackLanes(placed);
+  const lanes = Math.max(1, ...stacked.map((x) => x.lane + 1));
   return (
-    <div className="relative" style={{ height: lanes * 34 + 10 }}>
-      {stacked.map((s) => {
-        const pos = blockPosition(s.start, s.end, range, win);
-        if (!pos) return null;
-        return (
-          <div key={s.key} className="absolute px-0.5" style={{ left: `${pos.left}%`, width: `${pos.width}%`, top: 5 + s.lane * 34, height: 30 }}>
-            {render(s)}
-          </div>
-        );
-      })}
+    <div className="relative" style={{ height: lanes * (BLOCK_H + BLOCK_GAP) + 8 }}>
+      {stacked.map(({ s, pos, lane }) => (
+        <div key={s.key} className={cn("absolute", week ? "px-1.5" : "px-0.5")} style={{ left: `${pos.left}%`, width: `${pos.width}%`, top: 6 + lane * (BLOCK_H + BLOCK_GAP), height: BLOCK_H }}>
+          {render(s)}
+        </div>
+      ))}
     </div>
   );
 }
@@ -412,14 +423,27 @@ function ShiftBlock({ s, label, status, onClick, drag, uncovered }: { s: BoardSh
       type="button"
       onClick={onClick}
       {...drag}
-      title={`${s.title} · ${formatTime(s.start)}–${formatTime(s.end)}`}
-      className={cn("flex h-full w-full min-w-0 items-center gap-1.5 overflow-hidden rounded-md border bg-card px-1.5 text-left text-[11px] shadow-xs hover:shadow-sm", drag && "cursor-grab active:cursor-grabbing", uncovered && "border-dashed border-warning", status === "rechazado" && "opacity-50 line-through", !s.published && "bg-subtle")}
-      style={{ borderLeft: `3px solid ${color}` }}
+      title={`${s.projectName ?? s.title} · ${s.title} · ${formatTime(s.start)}–${formatTime(s.end)}${s.published ? "" : " · sin publicar"}`}
+      className={cn(
+        "flex h-full w-full min-w-0 flex-col justify-center overflow-hidden rounded-md border py-1 pl-2 pr-1.5 text-left text-[11px] leading-tight shadow-xs transition-shadow hover:shadow-md",
+        drag && "cursor-grab active:cursor-grabbing",
+        uncovered && "border-dashed border-warning",
+        status === "rechazado" && "opacity-50 line-through",
+        !s.published && "border-dashed",
+      )}
+      style={{ borderLeft: `3px solid ${color}`, background: `color-mix(in oklab, ${color} ${s.published ? 14 : 6}%, var(--card))` }}
     >
-      <span className="sr-only">{PHASE_LABELS[s.phaseKind as PhaseKind] ?? s.phaseKind}: </span>
-      <span className="truncate font-medium">{s.projectName ?? s.title}</span>
-      {label && <span className={cn("ml-auto shrink-0 tabular", uncovered && "text-warning")}>{label}</span>}
-      {status === "confirmado" && <span className="ml-auto size-1.5 shrink-0 rounded-full bg-success" aria-label="Confirmado" />}
+      <span className="flex w-full min-w-0 items-center gap-1.5">
+        <span className="truncate font-semibold">{s.projectName ?? s.title}</span>
+        {label && <span className={cn("ml-auto shrink-0 rounded bg-background/70 px-1 text-[10px] font-medium tabular", uncovered && "text-warning")}>{label}</span>}
+        {status === "confirmado" && <span className="ml-auto size-1.5 shrink-0 rounded-full bg-success" aria-label="Confirmado" />}
+      </span>
+      <span className="flex w-full min-w-0 items-center gap-1 text-[10px] text-muted-foreground">
+        <span className="shrink-0 tabular">
+          {formatTime(s.start)}–{formatTime(s.end)}
+        </span>
+        <span className="truncate">· {PHASE_LABELS[s.phaseKind as PhaseKind] ?? s.phaseKind}</span>
+      </span>
     </button>
   );
 }

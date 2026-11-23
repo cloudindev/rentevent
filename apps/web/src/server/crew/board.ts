@@ -65,6 +65,22 @@ export function blockPosition(start: number, end: number, range: Pick<BoardRange
   return { left, width: Math.max(1.2, right - left) };
 }
 
+/**
+ * Week view placement: snaps a block to whole day columns (from its first to its
+ * last day), so short or early shifts stay readable instead of becoming slivers.
+ * `from`/`to` are day indexes usable for lane stacking.
+ */
+export function dayBlockPosition(start: number, end: number, range: BoardRange) {
+  const s = Math.max(start, range.start);
+  const e = Math.min(end, range.end);
+  if (e <= s) return null;
+  const n = range.days.length;
+  const idx = (t: number) => Math.max(0, range.days.findIndex((d) => t >= d.start && t < d.end));
+  const from = idx(s);
+  const to = idx(e - 1) + 1;
+  return { left: (from / n) * 100, width: ((to - from) / n) * 100, from, to };
+}
+
 /** Assigns lane indexes so overlapping blocks in a row stack instead of overlapping. */
 export function stackLanes<T extends { start: number; end: number }>(blocks: T[]): (T & { lane: number })[] {
   const sorted = [...blocks].sort((a, b) => a.start - b.start);
