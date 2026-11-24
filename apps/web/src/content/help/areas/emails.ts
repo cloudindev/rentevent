@@ -1,0 +1,81 @@
+import type { HelpArea } from "../types";
+
+export const area: HelpArea = {
+  slug: "emails",
+  title: "Emails",
+  summary: "Bandeja de correo compartida de la empresa, con respuestas, vínculos a pedidos, proyectos y contactos, y plantillas reutilizables.",
+  overview: [
+    "Emails es la bandeja compartida de tu empresa dentro de Rentevent. Aquí aparecen los correos que se envían desde la aplicación y los que llegan al buzón conectado, para que todo el equipo vea la misma conversación con cada cliente.",
+    "Cada correo puede vincularse a un pedido, un proyecto o un contacto y así aparece también en el historial de ese registro. Los correos entrantes se vinculan solos cuando el asunto incluye un número de pedido o cuando el remitente coincide con el correo de un contacto.",
+    "En la pestaña **Plantillas** guardas textos que se repiten, como presupuestos, confirmaciones o recordatorios. Las usas al redactar y también desde los Workflows, que las rellenan automáticamente con los datos del pedido.",
+    "Los correos se envían con el remitente de la empresa configurado en Configuración. Si el envío de correo no está configurado, se guardan igualmente en la bandeja marcados como envío simulado.",
+  ],
+  concepts: [
+    { term: "Bandeja compartida", definition: "Lista común de correos recibidos y enviados de la empresa, visible para todos los usuarios." },
+    { term: "Vincular", definition: "Asociar un correo a un pedido, proyecto o contacto para verlo en su historial." },
+    { term: "Hilo", definition: "Conjunto de un correo y sus respuestas, que se muestran plegados sobre el mensaje abierto." },
+    { term: "Plantilla", definition: "Asunto y cuerpo reutilizables, identificados por una clave que usan los workflows." },
+    { term: "Variables", definition: "Huecos como {{cliente}} o {{pedido}} que los workflows sustituyen por los datos reales del pedido." },
+    { term: "Envío simulado", definition: "Correo guardado en la bandeja pero que no ha salido porque el envío no está configurado." },
+  ],
+  articles: [
+    {
+      slug: "leer-bandeja",
+      title: "Leer y filtrar la bandeja compartida",
+      summary: "Encuentra rápidamente los correos pendientes y consulta cada conversación.",
+      path: "/app/emails",
+      steps: [
+        { title: "Abre Emails", text: "Entra en **Emails**. En la pestaña **Bandeja compartida** verás la lista a la izquierda y el correo abierto a la derecha. La cabecera indica cuántos hay sin leer." },
+        { title: "Filtra la lista", text: "Usa **Todos**, **No leídos**, **Recibidos** o **Enviados**. Los no leídos aparecen en negrita con un punto de color." },
+        { title: "Abre un correo", text: "Pulsa un correo de la lista. Se marca como leído al abrirlo y muestra el asunto, el remitente o destinatario, la fecha y el registro vinculado." },
+        { title: "Revisa el hilo", text: "Si hay respuestas, aparecen plegadas encima del mensaje. Pulsa cada una para desplegarla." },
+        { title: "Déjalo pendiente", text: "Pulsa **Marcar como no leído** para que vuelva a contar como pendiente." },
+      ],
+    },
+    {
+      slug: "redactar-responder",
+      title: "Redactar y responder correos",
+      summary: "Envía correos con el remitente de la empresa y déjalos vinculados al pedido o cliente.",
+      path: "/app/emails",
+      roles: "Administrador, Comercial",
+      steps: [
+        { title: "Empieza un correo", text: "Pulsa **Redactar** en la cabecera, o abre un correo y pulsa **Responder**. Al responder se rellenan el destinatario y el asunto con Re:." },
+        { title: "Usa una plantilla", text: "Si tienes plantillas, elige una en **Plantilla** para rellenar asunto y cuerpo.", tip: "Al redactar a mano las variables {{…}} no se sustituyen solas. Revísalas y cámbialas por el dato real antes de enviar." },
+        { title: "Completa el mensaje", text: "Escribe el destinatario en **Para** (te sugiere los correos de tus contactos), el **Asunto** y el **Mensaje**." },
+        { title: "Vincula el correo", text: "En **Vincular a** elige **Pedido**, **Proyecto** o **Contacto** y después el registro concreto." },
+        { title: "Envía", text: "Pulsa **Enviar**. Verás **Correo enviado**, o **Correo enviado (modo simulado)** si el envío de correo no está configurado." },
+      ],
+      notes: ["Las respuestas a tus correos llegan al correo de la empresa y, si el buzón está conectado, entran en esta misma bandeja."],
+    },
+    {
+      slug: "vincular-correo",
+      title: "Vincular un correo a un pedido, proyecto o contacto",
+      summary: "Haz que un correo aparezca en el historial del registro correcto.",
+      path: "/app/emails",
+      roles: "Administrador, Comercial",
+      steps: [
+        { title: "Abre el correo", text: "En la **Bandeja compartida**, pulsa el correo. Bajo el asunto verás el registro vinculado o **Sin vincular**." },
+        { title: "Abre el diálogo", text: "Pulsa **Vincular**. Se abre **Vincular correo**." },
+        { title: "Elige el registro", text: "Selecciona el tipo (**Pedido**, **Proyecto** o **Contacto**) y luego el registro en **Elige…**." },
+        { title: "Guarda", text: "Pulsa **Vincular**. El enlace al registro aparece bajo el asunto." },
+        { title: "Quita un vínculo", text: "Para desvincular, elige **Sin vincular** en el tipo y pulsa **Quitar vínculo**." },
+      ],
+      notes: ["Los correos entrantes se vinculan solos al pedido si su número aparece en el asunto, o al contacto cuyo correo coincide con el remitente."],
+    },
+    {
+      slug: "plantillas-correo",
+      title: "Crear plantillas de correo",
+      summary: "Guarda textos reutilizables para presupuestos, confirmaciones o recordatorios.",
+      path: "/app/emails",
+      roles: "Administrador, Comercial",
+      steps: [
+        { title: "Abre las plantillas", text: "En **Emails**, pulsa la pestaña **Plantillas**." },
+        { title: "Crea una", text: "Pulsa **Nueva plantilla**." },
+        { title: "Pon nombre y clave", text: "Escribe el **Nombre** y la **Clave**, que es lo que usan los workflows para encontrarla.", tip: "La clave solo admite minúsculas, números y guion bajo, no puede repetirse y no se puede cambiar después." },
+        { title: "Escribe asunto y cuerpo", text: "Rellena **Asunto** y **Cuerpo**. Puedes usar las variables que aparecen encima de la lista, como {{cliente}}, {{pedido}}, {{montaje}} o {{enlace}}." },
+        { title: "Guarda", text: "Pulsa **Guardar**. Para cambiarla, pulsa **Editar** en su tarjeta." },
+        { title: "Elimina con cuidado", text: "El icono de papelera borra la plantilla tras confirmar. Los workflows que la usen dejarán de enviarla." },
+      ],
+    },
+  ],
+};

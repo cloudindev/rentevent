@@ -1,0 +1,101 @@
+import type { HelpArea } from "../types";
+
+export const area: HelpArea = {
+  slug: "workflows",
+  title: "Workflows",
+  summary: "Automatizaciones con disparador, condiciones y acción: correos al cliente, avisos de escasez, caducidad de opciones o publicación del planning.",
+  overview: [
+    "Un workflow es una regla del tipo «cuando pase esto, si se cumple aquello, haz lo otro». Sirve para que Rentevent haga solo tareas repetitivas: enviar la confirmación al cliente cuando se confirma un pedido, avisar de escasez de material, caducar opciones vencidas o publicar el planning de la semana siguiente.",
+    "Algunos disparadores reaccionan a eventos de los pedidos (**Pedido creado** y **Pedido confirmado**) y se ejecutan en el momento. El resto se ejecutan de forma programada, aproximadamente una vez al día o una vez a la semana.",
+    "Las acciones de correo usan las plantillas de **Emails** y los avisos se registran en **Comunicación**, igual que cualquier otra notificación. Cada ejecución queda en el **Registro de ejecuciones** con su resultado.",
+  ],
+  concepts: [
+    { term: "Disparador", definition: "Lo que pone en marcha el workflow: Pedido creado, Pedido confirmado, Opción a punto de caducar (48 h), Escasez de material detectada, Devolución mañana, Cada día o Cada semana." },
+    { term: "Condiciones", definition: "Filtros sobre los datos del pedido que deben cumplirse todos para ejecutar la acción." },
+    { term: "Acción", definition: "Lo que hace el workflow: Caducar opciones vencidas, Avisar de escasez de material, Enviar plantilla de correo, Publicar el planning de la semana o Enviar notificación." },
+    { term: "Variables", definition: "Huecos como {{cliente}}, {{pedido}}, {{montaje}} o {{total}} que se sustituyen por los datos del pedido en destinatarios, títulos y mensajes." },
+    { term: "Resultado de ejecución", definition: "ok (se hizo), omitido (no había nada que hacer o faltaba un dato) o error." },
+  ],
+  articles: [
+    {
+      slug: "crear-workflow",
+      title: "Crear un workflow",
+      summary: "Define una automatización con su disparador, sus condiciones y su acción.",
+      path: "/app/workflows",
+      roles: "Administrador, Comercial",
+      steps: [
+        { title: "Abre Workflows", text: "En el menú, dentro de **IA de Rentevent**, pulsa **Workflows**." },
+        { title: "Crea uno nuevo", text: "Pulsa **Nuevo workflow**. Se abre el panel con tres bloques: **Disparador**, **Condiciones** y **Acción**." },
+        { title: "Ponle nombre", text: "Escribe un **Nombre** que explique qué hace, por ejemplo Confirmación al cliente." },
+        { title: "Elige el disparador", text: "Selecciona cuándo se ejecuta, por ejemplo **Pedido confirmado** o **Devolución mañana**." },
+        { title: "Añade condiciones", text: "Pulsa **Condición** y elige el campo, el operador y el valor. Puedes añadir hasta 10; deben cumplirse todas.", tip: "Sin condiciones, el workflow se ejecuta siempre que salte el disparador." },
+        { title: "Elige la acción", text: "Selecciona la **Acción** y rellena los datos que pida: **Canal**, **Destinatario**, **Plantilla**, **Título** o **Mensaje**." },
+        { title: "Guarda", text: "Deja **Activo** encendido y pulsa **Guardar**. El workflow aparece en la lista con un resumen de su regla." },
+      ],
+    },
+    {
+      slug: "disparadores",
+      title: "Qué hace cada disparador",
+      summary: "Elige el disparador correcto según cuándo quieres que se ejecute la acción.",
+      path: "/app/workflows",
+      roles: "Administrador, Comercial",
+      steps: [
+        { title: "Pedido creado y Pedido confirmado", text: "Se ejecutan al momento, para ese pedido, cuando se crea un pedido o cuando se confirma." },
+        { title: "Opción a punto de caducar (48 h)", text: "Se revisa a diario y actúa sobre los pedidos en opción cuya caducidad vence en las próximas 48 horas." },
+        { title: "Devolución mañana", text: "Se revisa a diario y actúa sobre los pedidos confirmados o en curso cuyo retorno es al día siguiente." },
+        { title: "Escasez de material detectada", text: "Se revisa a diario. Combínalo con la acción **Avisar de escasez de material** para recibir la lista de pedidos de los próximos 60 días a los que les falta material." },
+        { title: "Cada día y Cada semana", text: "Se ejecutan de forma programada. Úsalos para tareas generales como **Caducar opciones vencidas** o **Publicar el planning de la semana**." },
+      ],
+      notes: [
+        "Con **Cada día** o **Cada semana**, las acciones de correo y notificación se aplican a cada pedido abierto (en consulta, opción, confirmado o en curso) que no haya terminado y cumpla las condiciones.",
+        "La acción **Publicar el planning de la semana** publica los turnos de la semana siguiente, de lunes a domingo, y avisa a los trabajadores asignados.",
+      ],
+    },
+    {
+      slug: "condiciones-variables",
+      title: "Usar condiciones y variables",
+      summary: "Filtra a qué pedidos se aplica un workflow y personaliza los mensajes con sus datos.",
+      path: "/app/workflows",
+      roles: "Administrador, Comercial",
+      steps: [
+        { title: "Elige el campo", text: "En cada condición elige entre **Total del último presupuesto (€)**, **Cliente**, **Estado del pedido**, **Días hasta la carga**, **Días hasta el retorno**, **Número de pedido** o **Título**." },
+        { title: "Elige el operador", text: "Usa =, !=, >, >=, <, <= o **contiene**. Los operadores de mayor y menor solo funcionan con números." },
+        { title: "Escribe el valor", text: "Por ejemplo, Total > 5000 o Días hasta la carga <= 3.", tip: "Las comparaciones de texto no distinguen mayúsculas ni acentos." },
+        { title: "Personaliza los textos", text: "En destinatario, título y mensaje puedes usar las variables que aparecen bajo la acción, como {{cliente}}, {{pedido}}, {{evento}}, {{montaje}}, {{retorno}}, {{empresa}}, {{enlace}}, {{total}} o {{estado}}." },
+        { title: "Quita una condición", text: "Pulsa el icono de papelera **Quitar condición** de su fila." },
+      ],
+      notes: ["{{enlace}} lleva al presupuesto público del pedido si existe; si no, a la ficha del pedido en Rentevent."],
+    },
+    {
+      slug: "enviar-plantilla-cliente",
+      title: "Enviar un correo automático al cliente",
+      summary: "Manda una plantilla de correo rellenada con los datos del pedido.",
+      path: "/app/workflows",
+      roles: "Administrador, Comercial",
+      steps: [
+        { title: "Prepara la plantilla", text: "En **Emails** > **Plantillas** crea la plantilla con sus variables, por ejemplo una confirmación de pedido." },
+        { title: "Crea el workflow", text: "En **Workflows**, pulsa **Nuevo workflow** y elige el disparador, por ejemplo **Pedido confirmado**." },
+        { title: "Elige la acción", text: "En **Acción** selecciona **Enviar plantilla de correo** y elige la **Plantilla**." },
+        { title: "Decide el destinatario", text: "Deja **Destinatario** vacío para enviarlo al correo del cliente del pedido, o escribe otra dirección.", tip: "Si el cliente no tiene correo, la ejecución queda como omitida." },
+        { title: "Guarda", text: "Pulsa **Guardar**. El correo enviado aparece en la bandeja de **Emails** vinculado al pedido." },
+      ],
+    },
+    {
+      slug: "probar-y-revisar",
+      title: "Ejecutar, activar y revisar workflows",
+      summary: "Lanza un workflow a mano, enciéndelo o apágalo y comprueba qué ha hecho.",
+      path: "/app/workflows",
+      roles: "Administrador, Comercial",
+      steps: [
+        { title: "Ejecútalo a mano", text: "Pulsa **Ejecutar ahora** en su fila. Verás un resumen con las ejecuciones correctas, las que dieron error o **Nada que hacer**." },
+        { title: "Actívalo o desactívalo", text: "Usa el interruptor de la izquierda de cada workflow. Desactivado, no se ejecuta ni por eventos ni por programación." },
+        { title: "Revisa el registro", text: "En **Registro de ejecuciones** ves cada ejecución con su resultado (**ok**, **omitido** o **error**), la fecha, el detalle y un enlace **ver pedido** cuando afecta a uno." },
+        { title: "Edita o elimina", text: "Pulsa el nombre del workflow para abrirlo. Desde el panel puedes cambiarlo y pulsar **Guardar**, o pulsar **Eliminar**." },
+      ],
+      notes: [
+        "Cada fila indica la última ejecución o **Nunca ejecutado**.",
+        "Los usuarios sin permiso de workflows ven la lista y el registro, pero no pueden cambiar nada.",
+      ],
+    },
+  ],
+};

@@ -160,7 +160,7 @@ export function MarketingHeader() {
             {open === "recursos" && (
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  ["/recursos", "Blog y guías", "Ideas para presupuestar, montar y vender más carpas."],
+                  ["/ayuda", "Ayuda", "Guías paso a paso de cada área de Rentevent, del configurador de carpas al almacén."],
                   ["/clientes", "Clientes", "Cómo trabajan otras empresas con Rentevent."],
                   ["/contacto", "Solicitar una demo", "Te enseñamos el producto con tus propias carpas."],
                 ].map(([href, title, text]) => (
@@ -192,7 +192,7 @@ export function MarketingHeader() {
           <div className="mt-2 border-t pt-2">
             {[
               ["/precios", t.pricing],
-              ["/recursos", t.resources],
+              ["/ayuda", "Ayuda"],
               ["/clientes", t.customers],
               ["/acceso", t.login],
             ].map(([href, l]) => (

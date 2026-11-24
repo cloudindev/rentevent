@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { MODULES, SOLUTIONS } from "@/components/marketing/content";
 import { LEGAL } from "@/components/marketing/legal";
 import { POSTS } from "@/content/posts";
+import { HELP_AREAS } from "@/content/help";
 
 const base = process.env.APP_URL ?? "https://rentevent.es";
 
@@ -12,7 +13,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
     page("/", 1),
     page("/precios", 0.9),
     page("/clientes", 0.6),
-    page("/recursos", 0.7),
+    page("/ayuda", 0.8),
+    ...HELP_AREAS.map((a) => page(`/ayuda/${a.slug}`, 0.6)),
+    ...HELP_AREAS.flatMap((a) => a.articles.map((x) => page(`/ayuda/${a.slug}/${x.slug}`, 0.5))),
+    page("/recursos", 0.5),
     page("/contacto", 0.8),
     page("/registro", 0.8),
     ...MODULES.map((m) => page(`/producto/${m.slug}`, 0.8)),

@@ -98,7 +98,7 @@ export default async function UnitsPage({ searchParams }: { searchParams: Promis
           <EmptyState
             icon={Package}
             title={q || estado || tipo ? "Ninguna unidad coincide" : "Aún no hay unidades con número de serie"}
-            description="Da de alta unidades desde la ficha de un artículo («Añadir unidades»): cada una recibe su número de serie y su código QR. Marca un artículo como caja o conjunto para empaquetar otras unidades dentro."
+            description="Da de alta unidades desde la ficha de un artículo con Generar QR: cada una recibe su número de serie y su código QR. Marca un artículo como caja o conjunto para empaquetar otras unidades dentro."
           />
         ) : (
           <Table>

@@ -89,7 +89,7 @@ export async function inspectionPlan(tx: Tx, now = new Date()): Promise<DueRow[]
   const units = await tx.select().from(itemUnits);
   const out: DueRow[] = [];
   for (const it of its) {
-    const myUnits = units.filter((u) => u.itemId === it.id && u.status !== "baja");
+    const myUnits = units.filter((u) => u.itemId === it.id && u.status !== "baja" && u.status !== "perdida");
     if (it.kind === "seriado" && myUnits.length) {
       for (const u of myUnits) {
         const due = inspectionDue(it.inspectionIntervalDays, u.lastInspectionAt, u.createdAt, now);

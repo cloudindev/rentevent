@@ -165,9 +165,15 @@ export async function closeReturn(tx: Tx, ctx: Ctx, listId: string, input: Retur
     if (missingAsLost) lost += missing;
     await tx.update(pickListLines).set({ returned, damaged, lost, status: "devuelto" }).where(eq(pickListLines.id, l.id));
     if (returned > 0) await tx.insert(movements).values({ itemId: l.itemId, orderId: data.list.orderId, kind: "retorno", quantity: returned, userId: ctx.user.id, note: `Retorno pedido ${orderNo}` });
+    const units = await settleUnits(tx, ctx, data.list.orderId, orderNo, l, { returned, damaged, lost }, outSerials.get(l.itemId) ?? []);
+    settled.push(...units.all);
     if (damaged > 0) {
       await tx.insert(movements).values({ itemId: l.itemId, orderId: data.list.orderId, kind: "dano", quantity: damaged, userId: ctx.user.id, note: i.note ?? `Dañado en pedido ${orderNo}` });
-      await tx.insert(repairs).values({ itemId: l.itemId, orderId: data.list.orderId, kind: "reparacion", quantity: damaged, status: "pendiente", reason: i.note || `Daño en el retorno del pedido ${orderNo}` });
+      // one repair per damaged serial unit (closing it frees that unit), the rest as one bulk repair
+      const reason = i.note || `Daño en el retorno del pedido ${orderNo}`;
+      const perUnit = units.damaged.map((unitId) => ({ itemId: l.itemId, unitId, orderId: data.list.orderId, kind: "reparacion", quantity: 1, status: "pendiente", reason }));
+      const bulk = damaged - perUnit.length;
+      await tx.insert(repairs).values([...perUnit, ...(bulk > 0 ? [{ itemId: l.itemId, orderId: data.list.orderId, kind: "reparacion", quantity: bulk, status: "pendiente", reason }] : [])]);
       await tx.update(items).set({ stockRepair: sql`${items.stockRepair} + ${damaged}` }).where(eq(items.id, l.itemId));
       repairsCreated++;
     }
@@ -181,7 +187,6 @@ export async function closeReturn(tx: Tx, ctx: Ctx, listId: string, input: Retur
       await tx.insert(movements).values({ itemId: l.itemId, orderId: data.list.orderId, kind: "perdida", quantity: -lost, userId: ctx.user.id, note: `Perdido en pedido ${orderNo}` });
       await tx.update(items).set({ stockTotal: sql`greatest(0, ${items.stockTotal} - ${lost})` }).where(eq(items.id, l.itemId));
     }
-    settled.push(...(await settleUnits(tx, ctx, data.list.orderId, orderNo, l, { returned, damaged, lost }, outSerials.get(l.itemId) ?? [])));
   }
   // cases/sets: scanned back → in the warehouse; with no scanning at all, the counts decide
   const outContainers = await tx
@@ -237,7 +242,7 @@ async function settleUnits(
       ),
     )
     .orderBy(asc(itemUnits.serial));
-  if (!mine.length) return [];
+  if (!mine.length) return { all: [] as string[], damaged: [] as string[] };
   const back = line.scannedUnits.length ? mine.filter((u) => line.scannedUnits.includes(u.serial)) : mine.slice(0, counts.returned);
   const rest = mine.filter((u) => !back.includes(u));
   const lostU = rest.slice(0, counts.lost);
@@ -257,5 +262,5 @@ async function settleUnits(
     await tx.update(itemUnits).set({ status: "perdida" }).where(inArray(itemUnits.id, ids(lostU)));
     await logUnitEvents(tx, ctx, ids(lostU), "perdido", { orderId, note: `No volvió del pedido ${orderNo}` });
   }
-  return mine.map((u) => u.id);
+  return { all: mine.map((u) => u.id), damaged: ids(damagedU) };
 }

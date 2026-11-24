@@ -1,0 +1,103 @@
+import type { HelpArea } from "../types";
+
+export const area: HelpArea = {
+  slug: "subalquileres",
+  title: "Subalquileres",
+  summary: "Material que alquilas a terceros para cubrir lo que te falta en un pedido.",
+  overview: [
+    "Cuando no tienes suficientes unidades de un artículo en unas fechas, puedes alquilárselas a otro proveedor. Eso es un subalquiler: indica qué artículo, cuántas unidades, de qué proveedor, entre qué fechas y con qué coste.",
+    "Los subalquileres confirmados o recibidos suman stock a la disponibilidad durante sus fechas, así que hacen desaparecer las faltas de material de los pedidos. Mientras estén en Solicitado no cuentan.",
+    "Puedes crearlos desde un pedido, con el botón Subalquilar del configurador de carpa, o directamente en esta pantalla. Si los vinculas a un pedido, su coste se imputa al proyecto de ese pedido y aparece en su rentabilidad.",
+    "Si tienes acceso a finanzas, desde cada subalquiler registras la factura del proveedor, que se crea en Compras.",
+  ],
+  concepts: [
+    { term: "Solicitado", definition: "Lo has pedido al proveedor pero aún no lo ha aceptado. No suma stock." },
+    { term: "Confirmado", definition: "El proveedor lo ha aceptado. Suma stock en las fechas del subalquiler." },
+    { term: "Recibido", definition: "El material ya está en tu almacén. Sigue sumando stock." },
+    { term: "Devuelto", definition: "Has devuelto el material al proveedor. Estado final." },
+    { term: "Cancelado", definition: "Subalquiler anulado. No suma stock ni cuenta en el coste total de esta pantalla; se puede volver a Solicitado." },
+    { term: "Recepción y Devolución", definition: "Fechas entre las que tendrás el material del proveedor." },
+  ],
+  articles: [
+    {
+      slug: "listado-de-subalquileres",
+      title: "Consultar los subalquileres",
+      summary: "Revisa todos los subalquileres, lo que falta por confirmar y su coste total.",
+      path: "/app/subalquileres",
+      steps: [
+        { title: "Abre la pantalla", text: "Pulsa **Subalquileres** en el menú lateral." },
+        { title: "Resumen", text: "Arriba verás cuántos están **por confirmar con el proveedor** y el **Coste total** de los que no están cancelados." },
+        { title: "Lee la tabla", text: "Cada fila muestra **Artículo**, **Cantidad**, **Proveedor**, **Fechas**, **Pedido**, **Coste** y **Estado**. Los más recientes aparecen arriba." },
+        { title: "Ve al pedido", text: "Pulsa el pedido de una fila para abrirlo y comprobar que la falta de material ha desaparecido." },
+      ],
+    },
+    {
+      slug: "crear-un-subalquiler",
+      title: "Crear un subalquiler",
+      summary: "Registra material que vas a alquilar a un proveedor.",
+      path: "/app/subalquileres",
+      roles: "Administrador, Comercial",
+      steps: [
+        { title: "Abre el formulario", text: "Pulsa **Nuevo subalquiler**. Se abre el panel lateral." },
+        { title: "Artículo y proveedor", text: "Elige el **Artículo** (obligatorio) y el **Proveedor**. En la lista solo aparecen los contactos de tipo Proveedor." },
+        { title: "Pedido", text: "Elige el **Pedido** al que va destinado, o deja **Sin pedido**. Al vincularlo, el coste se imputa al proyecto de ese pedido.", tip: "La lista muestra los pedidos que terminan a partir de hace 30 días." },
+        { title: "Cantidad y coste", text: "Indica la **Cantidad** (mayor que 0) y el **Coste (€)** sin IVA." },
+        { title: "Fechas", text: "Indica **Recepción** y **Devolución**. La devolución debe ser posterior a la recepción.", tip: "Para que cubra la falta, las fechas deben abarcar desde la carga hasta el retorno del pedido." },
+        { title: "Guarda", text: "Añade **Notas** si quieres y pulsa **Guardar**. El subalquiler se crea en estado Solicitado." },
+      ],
+    },
+    {
+      slug: "subalquilar-desde-un-pedido",
+      title: "Subalquilar desde un pedido",
+      summary: "Crea el subalquiler directamente desde la falta de material de una carpa.",
+      path: "/app/pedidos/[id]",
+      roles: "Administrador, Comercial",
+      steps: [
+        { title: "Abre la carpa", text: "En el pedido, pulsa la fila de la carpa con falta de material para abrir su configurador." },
+        { title: "Subalquila", text: "En el bloque **Falta material para estas fechas**, pulsa **Subalquilar N** junto a la pieza. Se crea un subalquiler por las unidades que faltan, con las fechas de carga y retorno del pedido." },
+        { title: "Completa los datos", text: "Ve a Subalquileres y pulsa el nombre del artículo para editarlo. Asigna el **Proveedor** y el **Coste (€)**, que se crean vacíos." },
+        { title: "Confírmalo", text: "Cuando el proveedor acepte, cambia el estado a Confirmado. Solo entonces deja de aparecer la falta en el pedido." },
+      ],
+    },
+    {
+      slug: "editar-un-subalquiler",
+      title: "Editar un subalquiler",
+      summary: "Corrige proveedor, cantidad, fechas, coste o pedido.",
+      path: "/app/subalquileres",
+      roles: "Administrador, Comercial",
+      steps: [
+        { title: "Abre el subalquiler", text: "Pulsa el nombre del artículo en la tabla. Se abre el panel **Editar subalquiler**." },
+        { title: "Cambia los datos", text: "Modifica los campos que necesites." },
+        { title: "Guarda", text: "Pulsa **Guardar**. La disponibilidad de los pedidos se recalcula con los nuevos datos." },
+      ],
+      notes: ["Los subalquileres no se borran. Si ya no lo necesitas, cámbialo a Cancelado."],
+    },
+    {
+      slug: "estados-del-subalquiler",
+      title: "Cambiar el estado de un subalquiler",
+      summary: "Sigue el subalquiler desde la solicitud hasta la devolución al proveedor.",
+      path: "/app/subalquileres",
+      roles: "Administrador, Comercial",
+      steps: [
+        { title: "Abre el menú", text: "Pulsa **Estado** al final de la fila. Solo verás los estados a los que puede pasar." },
+        { title: "Confirmado", text: "Desde Solicitado elige **Confirmado** cuando el proveedor acepte. Desde ese momento suma stock en sus fechas." },
+        { title: "Recibido", text: "Cuando llegue el material, elige **Recibido**. Se registra la fecha y hora de recepción." },
+        { title: "Devuelto", text: "Al devolverlo al proveedor, elige **Devuelto**. Es el estado final y el botón Estado desaparece." },
+        { title: "Cancelar o reactivar", text: "Un subalquiler Solicitado o Confirmado se puede pasar a **Cancelado**, y uno cancelado puede volver a **Solicitado**." },
+      ],
+    },
+    {
+      slug: "registrar-factura-del-proveedor",
+      title: "Registrar la factura del proveedor",
+      summary: "Pasa el coste del subalquiler a Compras para que conste como gasto.",
+      path: "/app/subalquileres",
+      roles: "Administrador",
+      steps: [
+        { title: "Localiza el subalquiler", text: "Busca la fila en la tabla. El botón solo aparece si el subalquiler no está cancelado." },
+        { title: "Registra", text: "Pulsa **Registrar factura**. Se crea una compra pendiente con el coste como base y un IVA del 21 %, y verás el aviso \"Factura de proveedor registrada en Compras\"." },
+        { title: "Abre la factura", text: "A partir de ahí el botón cambia a **Factura**. Púlsalo para abrir la compra en Compras." },
+      ],
+      notes: ["Solo se registra una factura por subalquiler. Revisa el importe en Compras si el proveedor te factura una cantidad distinta."],
+    },
+  ],
+};

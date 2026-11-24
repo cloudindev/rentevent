@@ -11,7 +11,7 @@ const COLS: { title: string; links: [string, string][] }[] = [
     links: [
       ["/precios", "Precios"],
       ["/clientes", "Clientes"],
-      ["/recursos", "Blog"],
+      ["/ayuda", "Ayuda"],
       ["/contacto", "Contacto"],
       ["/acceso", "Acceder"],
     ],

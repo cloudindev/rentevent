@@ -16,7 +16,8 @@ import { buildTimeline } from "@/server/timeline";
 import { ItemActions } from "./item-actions";
 import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { CONTAINER_LABEL, UNIT_STATUS_LABEL, UNIT_STATUS_TONE, unitWhere } from "@/server/warehouse/logic";
+import { CONTAINER_LABEL, labelUrl, UNIT_STATUS_LABEL, UNIT_STATUS_TONE, unitWhere } from "@/server/warehouse/logic";
+import { env } from "@/lib/env";
 import { now } from "@/lib/now";
 
 const MOVE_LABEL: Record<string, string> = { salida: "Salida", retorno: "Retorno", dano: "Daño", perdida: "Pérdida", ajuste: "Ajuste", reparacion_alta: "A reparación", reparacion_baja: "Reparado" };
@@ -45,7 +46,8 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
   });
   if (!data) notFound();
   const { item } = data;
-  const qrs = await Promise.all(data.units.slice(0, 60).map((u) => QRCode.toDataURL(u.qrCode, { margin: 1, width: 120 })));
+  // same content as the printed labels: the phone camera opens the unit page
+  const qrs = await Promise.all(data.units.slice(0, 60).map((u) => QRCode.toDataURL(labelUrl(env.appUrl, u.qrCode), { margin: 1, width: 120 })));
   const minFree = Math.min(...data.timeline.cells.map((c) => c.available));
   return (
     <>
