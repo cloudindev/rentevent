@@ -49,6 +49,8 @@ export type QuotePdfInput = {
   validUntil: string | null;
   snap: Snapshot;
   tenant: { name: string; legalName: string; taxId: string; address: string; phone: string; email: string; logo: string | null };
+  /** full-page cover image (data url), printed before everything else */
+  cover: { src: string; fit: "width" | "height" } | null;
   client: { name: string; taxId: string | null; email: string | null } | null;
   venue: string | null;
   image: string | null;
@@ -62,6 +64,15 @@ function QuoteDoc({ d }: { d: QuotePdfInput }) {
   const t = d.snap.totals;
   return (
     <Document title={`Presupuesto ${d.number}`} author={d.tenant.legalName || d.tenant.name}>
+      {d.cover ? (
+        <Page size="A4" style={{ padding: 0, backgroundColor: "#ffffff" }}>
+          {d.cover.fit === "width" ? (
+            <Image src={d.cover.src} style={{ width: "100%" }} />
+          ) : (
+            <Image src={d.cover.src} style={{ height: "100%", alignSelf: "center" }} />
+          )}
+        </Page>
+      ) : null}
       <Page size="A4" style={s.page}>
         <View style={[s.between, { marginBottom: 22 }]}>
           <View>
@@ -229,6 +240,19 @@ async function storageDataUrl(keyOrUrl: string | null | undefined): Promise<stri
   return `data:${obj.contentType};base64,${obj.body.toString("base64")}`;
 }
 
+/** A4 portrait is 1 : 1.414. Wider covers span the width (top aligned), taller ones the height. */
+async function coverImage(url: string | null | undefined): Promise<{ src: string; fit: "width" | "height" } | null> {
+  const src = await storageDataUrl(url);
+  if (!src) return null;
+  try {
+    const sharp = (await import("sharp")).default;
+    const m = await sharp(Buffer.from(src.slice(src.indexOf(",") + 1), "base64")).metadata();
+    return { src, fit: m.width && m.height && m.height / m.width > 842 / 595 ? "height" : "width" };
+  } catch {
+    return { src, fit: "width" };
+  }
+}
+
 export async function renderQuotePdf(tx: Tx, quoteId: string, tenantName: string): Promise<{ buffer: Buffer; fileName: string } | null> {
   const [q] = await tx.select().from(quotes).where(eq(quotes.id, quoteId));
   if (!q) return null;
@@ -269,6 +293,7 @@ export async function renderQuotePdf(tx: Tx, quoteId: string, tenantName: string
           email: st?.email ?? "",
           logo: await storageDataUrl(st?.logoUrl),
         },
+        cover: await coverImage(st?.quoteCoverUrl),
         client: c ? { name: c.name, taxId: c.taxId, email: c.email } : null,
         venue: v ? `${v.name}${v.city ? `, ${v.city}` : ""}` : p?.locationAddress ?? null,
         image: await storageDataUrl(snap.imageKey),

@@ -4,6 +4,7 @@ import { PageBody } from "@/components/app/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DEFAULT_PRICING } from "@rentevent/core";
 import { tenantDb } from "@/server/context";
+import { CoverUploader } from "./cover-uploader";
 import { TermsForm } from "./terms-form";
 
 export const metadata = { title: "Plantillas de documentos" };
@@ -13,6 +14,7 @@ export default async function TemplatesPage() {
   return (
     <PageBody className="max-w-4xl">
       <TermsForm quoteTerms={d.s?.quoteTerms ?? ""} quoteValidityDays={d.s?.quoteValidityDays ?? 30} depositPct={(d.s?.pricing as { depositPct?: number } | undefined)?.depositPct ?? DEFAULT_PRICING.depositPct} />
+      <CoverUploader coverUrl={d.s?.quoteCoverUrl ?? null} />
       <Card>
         <CardHeader>
           <div>

@@ -65,6 +65,8 @@ export const tenantSettings = pgTable("tenant_settings", {
   optionExpiryDays: integer("option_expiry_days").notNull().default(7),
   quoteValidityDays: integer("quote_validity_days").notNull().default(30),
   quoteTerms: text("quote_terms").notNull().default(""),
+  /** full-page image printed as the first page of quote PDFs (PNG/JPG, storage url) */
+  quoteCoverUrl: text("quote_cover_url"),
   capacity: jsonb("capacity").notNull().default({ coctelM2: 0.8, banqueteM2: 1.4, teatroM2: 0.9 }),
   fieldPermissions: jsonb("field_permissions").notNull().default({}),
   plan: text("plan").notNull().default("trial"),

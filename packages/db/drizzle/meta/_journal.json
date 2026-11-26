@@ -15,6 +15,13 @@
       "when": 1795474134243,
       "tag": "0001_unit_tracking",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795728450034,
+      "tag": "0002_quote_cover",
+      "breakpoints": true
     }
   ]
 }

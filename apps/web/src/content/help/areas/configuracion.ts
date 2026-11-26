@@ -273,6 +273,11 @@ export const area: HelpArea = {
           tip: "Se imprimen al final de cada presupuesto y en la página de aceptación que ve el cliente. Escribe cada apartado empezando por su número («1. Reserva y pago») en una línea propia y saldrá como título en negrita. El porcentaje de reserva es el que propone el botón de anticipo del pedido.",
         },
         {
+          title: "Añade una portada al presupuesto",
+          text: "En **Portada del presupuesto** pulsa **Subir portada** y elige una imagen PNG o JPG de hasta 8 MB. Sale a página completa como primera hoja del PDF de cada presupuesto, incluidos los que ya habías enviado si los vuelves a descargar. **Quitar portada** la elimina.",
+          tip: "Prepárala en A4 vertical (por ejemplo 2480 × 3508 px) para que se imprima nítida. Si es más ancha o más alta que un A4, se ajusta a la página sin recortarse.",
+        },
+        {
           title: "Consulta las plantillas de correo",
           text: "**Plantillas de correo** lista cada plantilla con su nombre, su clave y su asunto.",
         },
