@@ -52,7 +52,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       if (missing > 0) conflicts.push({ id: o.id, number: o.number, title: o.title, status: o.status, missing, start: o.periodStart });
     }
 
-    const sh = await tx.select({ id: shifts.id, title: shifts.title, s: shifts.startsAt, need: shifts.requiredPeople, have: sql<number>`(select count(*)::int from ${assignments} a where a.shift_id = ${shifts.id})` }).from(shifts).where(and(gte(shifts.startsAt, t0), lt(shifts.startsAt, in14))).orderBy(asc(shifts.startsAt));
+    const sh = await tx.select({ id: shifts.id, title: shifts.title, s: shifts.startsAt, need: shifts.requiredPeople, have: sql<number>`(select count(*)::int from ${assignments} a where a.shift_id = "shifts"."id")` }).from(shifts).where(and(gte(shifts.startsAt, t0), lt(shifts.startsAt, in14))).orderBy(asc(shifts.startsAt));
     const understaffed = sh.filter((s) => Number(s.have) < s.need);
 
     const pending = await tx.select().from(orders).where(inArray(orders.status, ["consulta", "opcion", "borrador"])).orderBy(asc(orders.periodStart)).limit(8);

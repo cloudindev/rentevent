@@ -21,8 +21,8 @@ export default async function CountsPage() {
         location: items.location,
         unit: items.unit,
         stockTotal: items.stockTotal,
-        lastCount: sql<string | null>`(select max(c.created_at) from stock_counts c where c.item_id = ${items.id})`,
-        lastDiff: sql<number | null>`(select (c.counted - c.expected)::float from stock_counts c where c.item_id = ${items.id} order by c.created_at desc limit 1)`,
+        lastCount: sql<string | null>`(select max(c.created_at) from stock_counts c where c.item_id = "items"."id")`,
+        lastDiff: sql<number | null>`(select (c.counted - c.expected)::float from stock_counts c where c.item_id = "items"."id" order by c.created_at desc limit 1)`,
       })
       .from(items)
       .where(eq(items.active, true))

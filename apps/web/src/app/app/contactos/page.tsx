@@ -20,8 +20,8 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
         email: contacts.email,
         phone: contacts.phone,
         archived: contacts.archived,
-        city: sql<string>`(select city from contact_addresses a where a.contact_id = ${contacts.id} order by is_default desc limit 1)`,
-        orders: sql<number>`(select count(*)::int from orders o where o.client_id = ${contacts.id})`,
+        city: sql<string>`(select city from contact_addresses a where a.contact_id = "contacts"."id" order by is_default desc limit 1)`,
+        orders: sql<number>`(select count(*)::int from orders o where o.client_id = "contacts"."id")`,
       })
       .from(contacts)
       .orderBy(asc(contacts.name));
