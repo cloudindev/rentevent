@@ -12,12 +12,12 @@ import { useAction } from "./use-action";
 type OrderOpt = { id: string; number: string; title: string; status: string; clientName: string | null };
 type ClientOpt = { id: string; name: string };
 
-export function NewInvoiceDialog({ orders, clients, defaultOrderId }: { orders: OrderOpt[]; clients: ClientOpt[]; defaultOrderId?: string }) {
+export function NewInvoiceDialog({ orders, clients, defaultOrderId, depositPct = 30 }: { orders: OrderOpt[]; clients: ClientOpt[]; defaultOrderId?: string; depositPct?: number }) {
   const router = useRouter();
   const [open, setOpen] = useState(Boolean(defaultOrderId));
   const [orderId, setOrderId] = useState(defaultOrderId ?? orders[0]?.id ?? "");
   const [kind, setKind] = useState<"normal" | "anticipo">("normal");
-  const [percent, setPercent] = useState(30);
+  const [percent, setPercent] = useState(depositPct);
   const [clientId, setClientId] = useState("");
   const { pending, run } = useAction();
   const go = (d: { id: string }) => {

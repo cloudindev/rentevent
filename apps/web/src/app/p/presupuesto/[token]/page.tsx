@@ -7,6 +7,7 @@ import { loadCatalog } from "@/server/catalog";
 import { findQuoteByToken, quoteBlock } from "@/server/public-quote";
 import { formatEUR, formatRange, initials } from "@/lib/utils";
 import { PublicQuoteClient } from "./client";
+import { termsBlocks } from "@/lib/terms";
 
 export const metadata: Metadata = { title: "Presupuesto", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
@@ -79,7 +80,17 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
         {snap.terms && (
           <section className="rounded-xl border bg-card p-5 text-sm">
             <h2 className="mb-2 font-semibold">Condiciones</h2>
-            <p className="whitespace-pre-wrap text-muted-foreground">{snap.terms}</p>
+            <div className="space-y-1.5 text-muted-foreground">
+              {termsBlocks(snap.terms).map((t, i) =>
+                t.kind === "text" ? (
+                  <p key={i}>{t.text}</p>
+                ) : (
+                  <p key={i} className={t.kind === "title" ? "font-semibold text-foreground" : "pt-2 font-medium text-foreground"}>
+                    {t.text}
+                  </p>
+                ),
+              )}
+            </div>
           </section>
         )}
         <p className="text-center text-xs text-muted-foreground">Presupuesto generado con Rentevent</p>

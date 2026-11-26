@@ -269,8 +269,8 @@ export const area: HelpArea = {
       steps: [
         {
           title: "Edita las condiciones del presupuesto",
-          text: "En **Condiciones del presupuesto** escribe las **Condiciones** y la **Validez (días)** y pulsa **Guardar**.",
-          tip: "Se imprimen al final de cada presupuesto y en la página de aceptación que ve el cliente.",
+          text: "En **Condiciones del presupuesto** escribe las **Condiciones**, la **Validez (días)** y la **Reserva (%)**, el anticipo que pides para confirmar, y pulsa **Guardar**.",
+          tip: "Se imprimen al final de cada presupuesto y en la página de aceptación que ve el cliente. Escribe cada apartado empezando por su número («1. Reserva y pago») en una línea propia y saldrá como título en negrita. El porcentaje de reserva es el que propone el botón de anticipo del pedido.",
         },
         {
           title: "Consulta las plantillas de correo",

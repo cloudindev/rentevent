@@ -2,6 +2,7 @@ import Link from "next/link";
 import { asc, emailTemplates, tenantSettings } from "@rentevent/db";
 import { PageBody } from "@/components/app/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DEFAULT_PRICING } from "@rentevent/core";
 import { tenantDb } from "@/server/context";
 import { TermsForm } from "./terms-form";
 
@@ -11,7 +12,7 @@ export default async function TemplatesPage() {
   const d = await tenantDb(async (tx) => ({ s: (await tx.select().from(tenantSettings))[0], templates: await tx.select().from(emailTemplates).orderBy(asc(emailTemplates.name)) }), "configuracion");
   return (
     <PageBody className="max-w-4xl">
-      <TermsForm quoteTerms={d.s?.quoteTerms ?? ""} quoteValidityDays={d.s?.quoteValidityDays ?? 30} />
+      <TermsForm quoteTerms={d.s?.quoteTerms ?? ""} quoteValidityDays={d.s?.quoteValidityDays ?? 30} depositPct={(d.s?.pricing as { depositPct?: number } | undefined)?.depositPct ?? DEFAULT_PRICING.depositPct} />
       <Card>
         <CardHeader>
           <div>

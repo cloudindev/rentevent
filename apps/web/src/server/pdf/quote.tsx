@@ -2,6 +2,7 @@ import "server-only";
 /* eslint-disable jsx-a11y/alt-text -- @react-pdf Image elements have no alt attribute */
 import { Document, Image, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import QRCode from "qrcode";
+import { termsBlocks } from "@/lib/terms";
 import { contacts, eq, orders, projects, quotes, tenantSettings, venues, type Tx } from "@rentevent/db";
 import { compositionSchema, PRICE_MODE_LABELS, type Composition, type PriceMode, type QuoteTotals } from "@rentevent/core";
 import { getObject } from "@/lib/adapters/storage";
@@ -169,7 +170,17 @@ function QuoteDoc({ d }: { d: QuotePdfInput }) {
 
       <Page size="A4" style={s.page}>
         <Text style={s.h2}>Condiciones</Text>
-        <Text style={{ lineHeight: 1.5, marginBottom: 20 }}>{d.snap.terms || "Precios sin IVA."}</Text>
+        <View style={{ marginBottom: 20 }}>
+          {termsBlocks(d.snap.terms || "Precios sin IVA.").map((t, i) =>
+            t.kind === "title" ? (
+              <Text key={i} style={{ fontFamily: "Helvetica-Bold", fontSize: 10, marginBottom: 6 }}>{t.text}</Text>
+            ) : t.kind === "heading" ? (
+              <Text key={i} style={{ fontFamily: "Helvetica-Bold", marginTop: i ? 7 : 0, marginBottom: 2 }} minPresenceAhead={24}>{t.text}</Text>
+            ) : (
+              <Text key={i} style={{ lineHeight: 1.35, fontSize: 8.5, marginBottom: 1 }}>{t.text}</Text>
+            ),
+          )}
+        </View>
         <View style={{ flexDirection: "row", gap: 16, alignItems: "flex-start" }}>
           <View style={[s.box, { flex: 1, minHeight: 110 }]}>
             <Text style={s.label}>Aceptación del cliente</Text>

@@ -30,7 +30,7 @@ async function blobToDataUrl(b: Blob): Promise<string> {
   });
 }
 
-export function QuotePanel({ orderId, quotes, clientEmail, canEdit, canInvoice, dirty, viewerApi, hasTent }: { orderId: string; quotes: OrderWorkspaceData["quotes"]; clientEmail: string | null; canEdit: boolean; canInvoice: boolean; dirty: boolean; viewerApi: React.RefObject<TentViewerApi | null>; hasTent: boolean }) {
+export function QuotePanel({ orderId, quotes, clientEmail, canEdit, canInvoice, dirty, viewerApi, hasTent, depositPct }: { depositPct: number; orderId: string; quotes: OrderWorkspaceData["quotes"]; clientEmail: string | null; canEdit: boolean; canInvoice: boolean; dirty: boolean; viewerApi: React.RefObject<TentViewerApi | null>; hasTent: boolean }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [send, setSend] = useState<{ id: string; number: string } | null>(null);
@@ -108,7 +108,7 @@ export function QuotePanel({ orderId, quotes, clientEmail, canEdit, canInvoice, 
       <div className="mt-3 flex flex-wrap gap-1 border-t pt-3">
         {canInvoice && (
           <>
-            <Button size="sm" variant="outline" disabled={pending} onClick={() => start(async () => { const r = await createInvoiceFromOrderAction({ orderId, kind: "anticipo", percent: 30 }); if (r.ok) router.push(`/app/ventas/${r.data.id}`); else toast.error(r.error); })}><Receipt /> Anticipo 30 %</Button>
+            <Button size="sm" variant="outline" disabled={pending} onClick={() => start(async () => { const r = await createInvoiceFromOrderAction({ orderId, kind: "anticipo", percent: depositPct }); if (r.ok) router.push(`/app/ventas/${r.data.id}`); else toast.error(r.error); })}><Receipt /> Anticipo {depositPct} %</Button>
             <Button size="sm" variant="outline" disabled={pending} onClick={() => start(async () => { const r = await createInvoiceFromOrderAction({ orderId, kind: "normal" }); if (r.ok) router.push(`/app/ventas/${r.data.id}`); else toast.error(r.error); })}><Receipt /> Facturar</Button>
           </>
         )}

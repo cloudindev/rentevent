@@ -117,7 +117,7 @@ async function issuedAdvances(tx: Tx, orderId: string) {
 
 /**
  * Creates a draft invoice from an order. `kind: "anticipo"` bills `percent`
- * (default 30 %) of the base; a final invoice deducts issued advances.
+ * (default: the company's booking %) of the base; a final invoice deducts issued advances.
  */
 export async function createInvoiceFromOrder(tx: Tx, ctx: Ctx, input: { orderId: string; kind: "normal" | "anticipo"; percent?: number }) {
   const { lines: orderLinesBilled, order } = await orderInvoiceLines(tx, input.orderId);
@@ -125,7 +125,8 @@ export async function createInvoiceFromOrder(tx: Tx, ctx: Ctx, input: { orderId:
   let lines: InvoiceLine[];
   if (input.kind === "anticipo") {
     const t = invoiceTotals(orderLinesBilled);
-    lines = advanceLines(t.breakdown, input.percent ?? 30, `Anticipo pedido ${order.number} · ${order.title}`);
+    const pct = input.percent ?? (await pricingSettings(tx)).depositPct;
+    lines = advanceLines(t.breakdown, pct, `Anticipo pedido ${order.number} · ${order.title}`);
   } else {
     const advances = await issuedAdvances(tx, order.id);
     lines = [...orderLinesBilled, ...advanceDeductionLines(advances.map((a) => ({ fullNumber: a.fullNumber!, lines: parseLines(a.lines) })))];

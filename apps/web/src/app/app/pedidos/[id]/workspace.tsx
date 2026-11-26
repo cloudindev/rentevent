@@ -154,7 +154,7 @@ export function OrderWorkspace({ data, perms }: { data: OrderWorkspaceData; perm
         </div>
         <aside className="space-y-5 xl:sticky xl:top-20 xl:self-start">
           <TotalsPanel totals={computed.totals} rows={computed.rows} showMargin={perms.margin} shortTotal={shortTotal} order={order} days={days} />
-          <QuotePanel orderId={order.id} quotes={data.quotes} clientEmail={order.clientEmail} canEdit={perms.edit} canInvoice={perms.finance} dirty={dirty || saving} viewerApi={viewerApi} hasTent={lines.some((l) => l.kind === "carpa")} />
+          <QuotePanel depositPct={data.pricing.depositPct} orderId={order.id} quotes={data.quotes} clientEmail={order.clientEmail} canEdit={perms.edit} canInvoice={perms.finance} dirty={dirty || saving} viewerApi={viewerApi} hasTent={lines.some((l) => l.kind === "carpa")} />
           <section className="rounded-xl border bg-card p-4 text-sm">
             <h3 className="mb-2 font-semibold">Evento</h3>
             <dl className="grid grid-cols-[110px_1fr] gap-y-1.5">

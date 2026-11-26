@@ -30,6 +30,8 @@ export type PricingSettings = {
   transportCostPerKm: number;
   laborPricePerHour: number;
   laborCostPerHour: number;
+  /** % of the quote paid to confirm the booking (advance invoice) */
+  depositPct: number;
 };
 
 export const DEFAULT_PRICING: PricingSettings = {
@@ -49,6 +51,7 @@ export const DEFAULT_PRICING: PricingSettings = {
   transportCostPerKm: 0.95,
   laborPricePerHour: 30,
   laborCostPerHour: 19,
+  depositPct: 30,
 };
 
 const r2 = (n: number) => Math.round(n * 100) / 100;

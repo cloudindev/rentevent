@@ -238,7 +238,7 @@ export const area: HelpArea = {
       summary: "Crea facturas de anticipo o finales, duplica el pedido y abre su lista de carga.",
       path: "/app/pedidos/[id]",
       steps: [
-        { title: "Factura de anticipo", text: "Bajo los presupuestos pulsa **Anticipo 30 %**. Se crea un borrador de factura por el 30 % del pedido y se abre en Ventas.", tip: "Solo lo ven los roles con acceso a finanzas." },
+        { title: "Factura de anticipo", text: "Bajo los presupuestos pulsa **Anticipo**, que muestra el porcentaje de reserva de tu empresa (30 % si no lo has cambiado en **Configuración › Plantillas**). Se crea un borrador de factura por ese porcentaje del pedido y se abre en Ventas.", tip: "Solo lo ven los roles con acceso a finanzas." },
         { title: "Factura final", text: "Pulsa **Facturar** para crear un borrador con todas las líneas facturables. Si ya emitiste anticipos de este pedido, se descuentan automáticamente." },
         { title: "Lista de carga", text: "Pulsa **Lista de carga** para abrir el pedido en Almacén y preparar la salida del material." },
         { title: "Duplicar", text: "Pulsa **Duplicar** para crear una copia con el título \"(copia)\", en el mismo proyecto y con las mismas fechas y líneas. La copia empieza en Borrador.", tip: "Duplicar requiere el rol Administrador o Comercial." },

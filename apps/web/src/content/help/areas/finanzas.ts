@@ -106,7 +106,7 @@ export const area: HelpArea = {
         {
           title: "Indica el porcentaje",
           text: "Escribe el **Porcentaje** a facturar (por defecto 30). Se calcula sobre la base del pedido, respetando cada tipo de IVA.",
-          tip: "Desde la ficha del pedido, el botón **Anticipo 30 %** crea directamente el borrador con ese porcentaje.",
+          tip: "Desde la ficha del pedido, el botón **Anticipo** crea directamente el borrador con el porcentaje de reserva de **Configuración › Plantillas** (30 % si no lo cambias).",
         },
         {
           title: "Crea y emite",

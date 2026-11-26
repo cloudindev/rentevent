@@ -10,6 +10,8 @@ import { FilterBar } from "@/components/finance/filter-bar";
 import { NewInvoiceDialog, NewSeriesDialog } from "@/components/finance/new-invoice-dialog";
 import { InvoiceStatus, Kpi } from "@/components/finance/status";
 import { cn, formatDate, formatEUR } from "@/lib/utils";
+import { DEFAULT_PRICING } from "@rentevent/core";
+import { tenantSettings } from "@rentevent/db";
 import { tenantDb } from "@/server/context";
 import { INVOICE_KIND_LABELS, refreshOverdue } from "@/server/finance/invoicing";
 import { clientOptions, invoiceableOrders, listInvoices, listSeries, receivablesSummary } from "@/server/finance/queries";
@@ -31,14 +33,15 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
   const data = await tenantDb(async (tx) => {
     await refreshOverdue(tx);
     const tipo = vista === "anticipos" ? "anticipo" : vista === "rectificativas" ? "rectificativa" : vista === "facturas" ? "normal" : undefined;
-    const [rows, series, orders, clients, summary] = await Promise.all([
+    const [rows, series, orders, clients, summary, [st]] = await Promise.all([
       vista === "series" ? Promise.resolve([]) : listInvoices(tx, { ...sp, tipo }),
       listSeries(tx),
       invoiceableOrders(tx),
       clientOptions(tx),
       receivablesSummary(tx),
+      tx.select({ pricing: tenantSettings.pricing }).from(tenantSettings),
     ]);
-    return { rows, series, orders, clients, summary };
+    return { rows, series, orders, clients, summary, depositPct: (st?.pricing as { depositPct?: number } | undefined)?.depositPct ?? DEFAULT_PRICING.depositPct };
   }, "finanzas");
 
   const totals = data.rows.reduce((a, r) => ({ base: a.base + Number(r.subtotal), total: a.total + Number(r.total), pend: a.pend + (r.fullNumber && r.status !== "anulada" ? Number(r.total) - Number(r.paid) : 0) }), { base: 0, total: 0, pend: 0 });
@@ -53,7 +56,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
             <Download /> Libro de emitidas
           </a>
         </Button>
-        {vista === "series" ? <NewSeriesDialog /> : <NewInvoiceDialog orders={data.orders} clients={data.clients} defaultOrderId={sp.pedido} />}
+        {vista === "series" ? <NewSeriesDialog /> : <NewInvoiceDialog orders={data.orders} clients={data.clients} defaultOrderId={sp.pedido} depositPct={data.depositPct} />}
       </PageHeader>
       <PageBody>
         <div className="grid gap-3 sm:grid-cols-4">

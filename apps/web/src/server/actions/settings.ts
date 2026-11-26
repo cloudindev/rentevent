@@ -74,7 +74,8 @@ export const savePricing = tenantAction(pricingInput, "configuracion", async (in
   const days = pricing.durationTiers.map((t) => t.days);
   if (new Set(days).size !== days.length) throw new UserError("Hay tramos de duración repetidos.");
   pricing.durationTiers.sort((a, b) => a.days - b.days);
-  await tx.update(tenantSettings).set({ pricing: { ...DEFAULT_PRICING, ...pricing } });
+  const [cur] = await tx.select({ pricing: tenantSettings.pricing }).from(tenantSettings);
+  await tx.update(tenantSettings).set({ pricing: { ...DEFAULT_PRICING, ...((cur?.pricing as object) ?? {}), ...pricing } });
   for (const f of families) await tx.update(structureFamilies).set({ price: f.price, priceMode: f.priceMode }).where(eq(structureFamilies.id, f.id));
   await audit(tx, ctx, "tenant", ctx.tenantId, "editar", { tarifas: true });
   revalidatePath("/app/configuracion/tarifas");
@@ -92,12 +93,17 @@ export const saveFieldPermissions = tenantAction(
   },
 );
 
-export const saveQuoteTerms = tenantAction(z.object({ quoteTerms: z.string().max(6000), quoteValidityDays: z.coerce.number().int().min(1).max(365) }), "configuracion", async (input, tx, ctx) => {
-  await tx.update(tenantSettings).set(input);
+export const saveQuoteTerms = tenantAction(
+  z.object({ quoteTerms: z.string().max(6000), quoteValidityDays: z.coerce.number().int().min(1).max(365), depositPct: z.coerce.number().min(1).max(100) }),
+  "configuracion",
+  async ({ depositPct, ...input }, tx, ctx) => {
+  const [cur] = await tx.select({ pricing: tenantSettings.pricing }).from(tenantSettings);
+  await tx.update(tenantSettings).set({ ...input, pricing: { ...DEFAULT_PRICING, ...((cur?.pricing as object) ?? {}), depositPct } });
   await audit(tx, ctx, "tenant", ctx.tenantId, "editar", { condiciones: true });
   revalidatePath("/app/configuracion/plantillas");
   return { ok: true };
-});
+  },
+);
 
 // ── API keys & webhooks
 export const createApiKey = tenantAction(z.object({ name: z.string().trim().min(2).max(60) }), "configuracion", async ({ name }, tx, ctx) => {
