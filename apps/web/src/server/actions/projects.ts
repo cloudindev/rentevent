@@ -1,9 +1,10 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { asc, eq, files, orders, projectPhases, projects, tasks, venues } from "@rentevent/db";
+import { and, asc, eq, files, inArray, isNull, not, or, orders, projectPhases, projects, tasks, venues } from "@rentevent/db";
 import { deleteObject } from "@/lib/adapters/storage";
-import { audit } from "../audit";
+import { canCollaborate } from "@/lib/permissions";
+import { audit, diffOf } from "../audit";
 import { tenantAction, UserError } from "../action";
 import { nextCounter } from "../numbering";
 import { loadWorkLines } from "../orders";
@@ -43,9 +44,24 @@ export const updateProject = tenantAction(
   z.object({ id: z.string().uuid(), name: z.string().trim().min(2).max(120), clientId: z.string().uuid().nullable(), venueId: z.string().uuid().nullable(), description: z.string().max(2000).nullable(), color: z.string().max(20).nullable() }),
   "comercial",
   async (input, tx, ctx) => {
-    await tx.update(projects).set({ name: input.name, clientId: input.clientId, venueId: input.venueId, description: input.description, color: input.color }).where(eq(projects.id, input.id));
-    await audit(tx, ctx, "project", input.id, "editar");
+    const [p] = await tx.select().from(projects).where(eq(projects.id, input.id)).for("update");
+    if (!p) throw new UserError("Proyecto no encontrado");
+    const venueChanged = p.venueId !== input.venueId;
+    const [v] = venueChanged && input.venueId ? await tx.select().from(venues).where(eq(venues.id, input.venueId)) : [undefined];
+    await tx
+      .update(projects)
+      .set({ name: input.name, clientId: input.clientId, venueId: input.venueId, description: input.description, color: input.color, ...(venueChanged ? { lat: v?.lat ?? null, lng: v?.lng ?? null, locationAddress: v?.address ?? null, distanceKm: null } : {}) })
+      .where(eq(projects.id, input.id));
+    // open orders that had the project's previous client (or none) follow the new one
+    if (p.clientId !== input.clientId) {
+      await tx
+        .update(orders)
+        .set({ clientId: input.clientId })
+        .where(and(eq(orders.projectId, input.id), not(inArray(orders.status, ["devuelto", "cancelado"])), p.clientId ? or(eq(orders.clientId, p.clientId), isNull(orders.clientId)) : isNull(orders.clientId)));
+    }
+    await audit(tx, ctx, "project", input.id, "editar", diffOf({ name: p.name, clientId: p.clientId, venueId: p.venueId, description: p.description }, { name: input.name, clientId: input.clientId, venueId: input.venueId, description: input.description }));
     revalidatePath(`/app/proyectos/${input.id}`);
+    revalidatePath("/app/proyectos");
     return { id: input.id };
   },
 );
@@ -63,18 +79,21 @@ export const savePhase = tenantAction(
 );
 
 export const addTask = tenantAction(z.object({ projectId: z.string().uuid(), title: z.string().trim().min(1).max(200), dueAt: z.coerce.date().nullable() }), "ver", async (input, tx, ctx) => {
+  if (!canCollaborate(ctx.role)) throw new UserError("No tienes permiso para gestionar tareas.");
   await tx.insert(tasks).values({ projectId: input.projectId, title: input.title, dueAt: input.dueAt, assigneeId: ctx.user.id });
   revalidatePath(`/app/proyectos/${input.projectId}`);
   return { ok: true };
 });
 
-export const toggleTask = tenantAction(z.object({ id: z.string().uuid(), done: z.boolean() }), "ver", async ({ id, done }, tx) => {
+export const toggleTask = tenantAction(z.object({ id: z.string().uuid(), done: z.boolean() }), "ver", async ({ id, done }, tx, ctx) => {
+  if (!canCollaborate(ctx.role)) throw new UserError("No tienes permiso para gestionar tareas.");
   const [t] = await tx.update(tasks).set({ done }).where(eq(tasks.id, id)).returning();
   if (t?.projectId) revalidatePath(`/app/proyectos/${t.projectId}`);
   return { ok: true };
 });
 
-export const deleteTask = tenantAction(z.object({ id: z.string().uuid() }), "ver", async ({ id }, tx) => {
+export const deleteTask = tenantAction(z.object({ id: z.string().uuid() }), "ver", async ({ id }, tx, ctx) => {
+  if (!canCollaborate(ctx.role)) throw new UserError("No tienes permiso para gestionar tareas.");
   const [t] = await tx.delete(tasks).where(eq(tasks.id, id)).returning();
   if (t?.projectId) revalidatePath(`/app/proyectos/${t.projectId}`);
   return { ok: true };

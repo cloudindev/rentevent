@@ -157,14 +157,20 @@ async function executeAction(tx: Tx, action: WorkflowAction, vars: Record<string
       const week = await tx.update(shifts).set({ published: true }).where(and(gte(shifts.startsAt, from), lt(shifts.startsAt, to))).returning({ id: shifts.id });
       if (!week.length) return { status: "omitido", detail: "No hay turnos la semana que viene" };
       const people = await tx
-        .selectDistinct({ id: workers.id, name: workers.name, email: workers.email, userId: workers.userId })
+        .selectDistinct({ id: workers.id, name: workers.name, email: workers.email, phone: workers.phone, userId: workers.userId })
         .from(assignments)
         .innerJoin(workers, eq(workers.id, assignments.workerId))
         .where(inArray(assignments.shiftId, week.map((w) => w.id)));
+      let sent = 0;
       for (const p of people) {
-        await notify(tx, { channel: action.channel, recipient: action.channel === "email" ? p.email ?? p.name : p.name, userId: p.userId, title: "Planning publicado", body: `Ya tienes tu planning de la semana del ${new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "long" }).format(from)}.`, url: `${env.appUrl}/m` });
+        // same recipients as Publicar planning: email → correo, WhatsApp → teléfono; skip who lacks it
+        const recipient = action.channel === "email" ? p.email : action.channel === "whatsapp" ? p.phone : p.name;
+        if (!recipient) continue;
+        await notify(tx, { channel: action.channel, recipient, userId: p.userId, title: "Planning publicado", body: `Ya tienes tu planning de la semana del ${new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "long" }).format(from)}.`, entity: "worker", entityId: p.id, url: `${env.appUrl}/m` });
+        sent++;
       }
-      return { status: "ok", detail: `${week.length} turno(s) publicados y ${people.length} trabajador(es) avisados` };
+      const skipped = people.length - sent;
+      return { status: "ok", detail: `${week.length} turno(s) publicados y ${sent} trabajador(es) avisados${skipped ? ` (${skipped} sin ${action.channel === "email" ? "correo" : "teléfono"})` : ""}` };
     }
     case "notificar": {
       const to = renderTemplate(action.to, vars);
@@ -183,7 +189,10 @@ async function runOne(tx: Tx, wf: WorkflowRow, entity: EntityRef): Promise<RunRe
   let vars: Record<string, string | number> = {};
   try {
     if (entity) vars = await orderContext(tx, entity.id);
-    if (!evaluateConditions(conditions, vars)) return { workflowId: wf.id, status: "omitido", detail: "No cumple las condiciones", entityId: entity?.id ?? null };
+    if (!evaluateConditions(conditions, vars)) {
+      await tx.insert(workflowRuns).values({ workflowId: wf.id, status: "omitido", detail: "No cumple las condiciones", entity: entity?.type ?? null, entityId: entity?.id ?? null });
+      return { workflowId: wf.id, status: "omitido", detail: "No cumple las condiciones", entityId: entity?.id ?? null };
+    }
     const r = await executeAction(tx, action, vars, entity);
     await tx.insert(workflowRuns).values({ workflowId: wf.id, status: r.status, detail: r.detail, entity: entity?.type ?? null, entityId: entity?.id ?? null });
     return { workflowId: wf.id, ...r, entityId: entity?.id ?? null };

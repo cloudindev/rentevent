@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Mail, MapPin, Phone, Users } from "lucide-react";
-import { and, asc, auditLog, contactAddresses, contactPersons, contacts, desc, emails, eq, invoices, notes, orders, or } from "@rentevent/db";
+import { and, asc, auditLog, contactAddresses, contactPersons, contacts, count, desc, emails, eq, invoices, notes, orders, or, sql } from "@rentevent/db";
 import { AuditTrail } from "@/components/app/audit-trail";
 import { NotesPanel } from "@/components/app/notes-panel";
 import { PageBody, PageHeader } from "@/components/app/page-header";
@@ -19,7 +19,7 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
   const d = await tenantDb(async (tx, ctx) => {
     const [c] = await tx.select().from(contacts).where(eq(contacts.id, id));
     if (!c) return null;
-    const [addrs, persons, ords, invs, mails, nts, audits] = await Promise.all([
+    const [addrs, persons, ords, invs, mails, nts, audits, [orderCount], [money]] = await Promise.all([
       tx.select().from(contactAddresses).where(eq(contactAddresses.contactId, id)).orderBy(desc(contactAddresses.isDefault)),
       tx.select().from(contactPersons).where(eq(contactPersons.contactId, id)).orderBy(asc(contactPersons.name)),
       tx.select().from(orders).where(eq(orders.clientId, id)).orderBy(desc(orders.periodStart)).limit(30),
@@ -27,13 +27,22 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
       tx.select().from(emails).where(or(and(eq(emails.entity, "contact"), eq(emails.entityId, id)), c.email ? or(eq(emails.fromAddress, c.email), eq(emails.toAddress, c.email)) : undefined)).orderBy(desc(emails.createdAt)).limit(20),
       tx.select().from(notes).where(and(eq(notes.entity, "contact"), eq(notes.entityId, id))).orderBy(desc(notes.createdAt)),
       tx.select().from(auditLog).where(and(eq(auditLog.entity, "contact"), eq(auditLog.entityId, id))).orderBy(desc(auditLog.createdAt)).limit(20),
+      // totals over all orders and invoices (the lists below only show the latest 30)
+      tx.select({ n: count() }).from(orders).where(eq(orders.clientId, id)),
+      tx
+        .select({
+          n: count(),
+          revenue: sql<number>`coalesce(sum(${invoices.total}) filter (where ${invoices.status} not in ('borrador', 'anulada')), 0)::float`,
+          pending: sql<number>`coalesce(sum(${invoices.total} - ${invoices.paid}) filter (where ${invoices.status} in ('emitida', 'vencida')), 0)::float`,
+        })
+        .from(invoices)
+        .where(eq(invoices.clientId, id)),
     ]);
-    return { c, addrs, persons, ords, invs, mails, nts, audits, role: ctx.role };
+    return { c, addrs, persons, ords, invs, mails, nts, audits, orderCount: orderCount?.n ?? 0, invoiceCount: money?.n ?? 0, revenue: Number(money?.revenue ?? 0), pending: Number(money?.pending ?? 0), role: ctx.role };
   });
   if (!d) notFound();
   const { c } = d;
-  const revenue = d.invs.filter((i) => i.status !== "borrador" && i.status !== "anulada").reduce((s, i) => s + Number(i.total), 0);
-  const pending = d.invs.filter((i) => ["emitida", "vencida"].includes(i.status)).reduce((s, i) => s + Number(i.total) - Number(i.paid), 0);
+  const { revenue, pending } = d;
   return (
     <>
       <PageHeader icon={Users} title={c.name} back={{ href: "/app/contactos", label: "Contactos" }}>
@@ -52,7 +61,7 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
           <div className="min-w-0 space-y-5">
             <div className="grid gap-3 sm:grid-cols-4">
               {[
-                ["Pedidos", String(d.ords.length)],
+                ["Pedidos", String(d.orderCount)],
                 ["Facturado", formatEUR(revenue)],
                 ["Pendiente de cobro", formatEUR(pending)],
                 ["Descuento", `${Number(c.discountPct)} %`],
@@ -64,7 +73,7 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
               ))}
             </div>
             <Card>
-              <CardHeader><CardTitle>Pedidos</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Pedidos</CardTitle>{d.orderCount > d.ords.length && <span className="text-xs text-muted-foreground">Últimos {d.ords.length} de {d.orderCount}</span>}</CardHeader>
               <CardContent>
                 {d.ords.length === 0 ? <p className="text-sm text-muted-foreground">Sin pedidos.</p> : (
                   <ul className="divide-y text-sm">
@@ -79,7 +88,7 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
               </CardContent>
             </Card>
             <Card>
-              <CardHeader><CardTitle>Facturas</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Facturas</CardTitle>{d.invoiceCount > d.invs.length && <span className="text-xs text-muted-foreground">Últimas {d.invs.length} de {d.invoiceCount}</span>}</CardHeader>
               <CardContent>
                 {d.invs.length === 0 ? <p className="text-sm text-muted-foreground">Sin facturas.</p> : (
                   <ul className="divide-y text-sm">

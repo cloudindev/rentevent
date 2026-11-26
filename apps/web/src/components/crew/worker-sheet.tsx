@@ -40,7 +40,8 @@ export function WorkerSheet({ open, onOpenChange, initial, showCost }: { open: b
         onSubmit={(e) => {
           e.preventDefault();
           start(async () => {
-            const r = await saveWorker(v);
+            // without the cost permission the €/h isn't loaded (it's a 0 placeholder): never send it
+            const r = await saveWorker(showCost ? v : { ...v, costPerHour: undefined });
             if (!r.ok) {
               setErrors(r.fieldErrors ?? {});
               toast.error(r.error);

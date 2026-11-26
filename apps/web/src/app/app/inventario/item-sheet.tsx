@@ -2,7 +2,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { PART_ROLES, type PartRole } from "@rentevent/core";
+import { PART_ROLE_LABELS, PART_ROLES, ROLE_AMOUNT_FIELDS, type PartRole } from "@rentevent/core";
 import { Sheet } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Field, Input, NativeSelect, Textarea } from "@/components/ui/input";
@@ -32,8 +32,6 @@ export type ItemFormValues = {
 };
 
 const EMPTY: ItemFormValues = { id: null, sku: "", name: "", category: "General", kind: "granel", unit: "ud", role: "otro", roleAmount: 1, weightKg: 0, volumeM3: 0, price: 0, priceMode: "unidad", costPrice: 0, replacementCost: 0, stockTotal: 0, location: null, description: null, inspectionIntervalDays: null, active: true };
-
-const ROLE_LABELS: Partial<Record<PartRole, string>> = { otro: "Otro (no se dibuja)", cercha: "Cercha", pilar: "Pilar", lona_techo_blanca: "Lona techo blanca", lona_techo_transparente: "Lona techo transparente" };
 
 export function ItemSheet({ open, onOpenChange, initial }: { open: boolean; onOpenChange: (o: boolean) => void; initial?: ItemFormValues }) {
   const router = useRouter();
@@ -104,6 +102,8 @@ export function ItemSheet({ open, onOpenChange, initial }: { open: boolean; onOp
             <option value="periodo">Por periodo</option>
             <option value="m2">Por m²</option>
             <option value="ml">Por metro lineal</option>
+            <option value="hora">Por hora</option>
+            <option value="km">Por km</option>
             <option value="incluido">Incluido en la carpa</option>
           </NativeSelect>
         </Field>
@@ -123,11 +123,16 @@ export function ItemSheet({ open, onOpenChange, initial }: { open: boolean; onOp
           <NativeSelect id="it-role" value={v.role} onChange={set("role")}>
             {PART_ROLES.map((r) => (
               <option key={r} value={r}>
-                {ROLE_LABELS[r] ?? r.replace(/_/g, " ")}
+                {PART_ROLE_LABELS[r]}
               </option>
             ))}
           </NativeSelect>
         </Field>
+        {ROLE_AMOUNT_FIELDS[v.role] && (
+          <Field label={ROLE_AMOUNT_FIELDS[v.role]!.label} htmlFor="it-ra" hint={ROLE_AMOUNT_FIELDS[v.role]!.hint}>
+            <Input id="it-ra" type="number" step="0.1" min={0.01} value={v.roleAmount} onChange={set("roleAmount")} />
+          </Field>
+        )}
         <Field label="Revisión cada (días)" htmlFor="it-insp">
           <Input id="it-insp" type="number" min={0} value={v.inspectionIntervalDays ?? ""} onChange={(e) => setV({ ...v, inspectionIntervalDays: e.target.value ? Number(e.target.value) : null })} />
         </Field>

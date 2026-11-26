@@ -107,8 +107,8 @@ export const area: HelpArea = {
       roles: "Administrador, Jefe de almacén, Jefe de equipo",
       steps: [
         { title: "Abre Retornos", text: "En **Almacén** pulsa la pestaña **Retornos**." },
-        { title: "Busca el pedido", text: "En **Pedidos en obra sin lista de retorno** aparecen los pedidos en curso que aún no tienen lista." },
-        { title: "Crea la lista", text: "Pulsa **Preparar retorno**. La lista parte de lo que se cargó en la salida; si no hubo carga registrada, de lo que lleva el pedido." },
+        { title: "Busca el pedido", text: "En **Pedidos en obra sin retorno abierto** aparecen los pedidos en curso que aún no tienen lista de retorno, y los que se cerraron con material pendiente (marcados como **retorno parcial**)." },
+        { title: "Crea la lista", text: "Pulsa **Preparar retorno**. La lista parte de lo que se cargó en la salida; si no hubo carga registrada, de lo que lleva el pedido.", tip: "En un retorno parcial el botón es **Recibir lo pendiente** y la nueva lista solo lleva lo que faltaba." },
         { title: "Sigue el estado", text: "La lista está **Por volver** hasta su fecha de retorno y **Retrasado** si esa fecha ya ha pasado." },
       ],
     },
@@ -137,17 +137,18 @@ export const area: HelpArea = {
       steps: [
         { title: "Pulsa Cerrar retorno", text: "Cuando hayas contado, pulsa **Cerrar retorno**. Se abre un resumen." },
         { title: "Revisa el resumen", text: "Comprueba **Devuelto**, **A reparación**, **Lonas a limpieza**, **Perdido** y **Sin contar**." },
-        { title: "Decide qué hacer con lo que falta", text: "Si hay material **Sin contar**, activa **Dar por perdido lo que falta** para darlo por perdido. Si no lo activas, el pedido sigue en obra." },
+        { title: "Decide qué hacer con lo que falta", text: "Si hay material **Sin contar**, activa **Dar por perdido lo que falta** para darlo por perdido. Si no lo activas, el pedido sigue en obra y podrás recibir lo que falta más tarde." },
         { title: "Confirma", text: "Pulsa **Cerrar retorno** en el resumen. Verás «Retorno cerrado: pedido devuelto» o «Retorno cerrado con material pendiente»." },
       ],
       notes: [
         "Lo devuelto suma al stock con un movimiento de **Retorno**.",
         "Lo dañado abre una reparación en **Mantenimiento › Reparaciones** y deja de estar disponible hasta que se cierre.",
-        "Las lonas marcadas como sucias abren una limpieza en **Mantenimiento › Limpieza de lonas**.",
+        "Las lonas marcadas como sucias abren una limpieza en **Mantenimiento › Limpieza de lonas**. Si son unidades seriadas, cada una pasa a **En limpieza** con su propia limpieza y vuelve a **Disponible** al terminarla.",
         "Lo perdido se descuenta del stock total.",
-        "Unidades seriadas: las escaneadas vuelven a **Disponible**. Si la línea se contó a mano, vuelven tantas como indiques, solo de las de ese pedido. De las que faltan, las perdidas pasan a **Perdida** y las dañadas a **En reparación**. El resto sigue fuera con su pedido.",
+        "Unidades seriadas: las escaneadas vuelven a **Disponible** (o a **En limpieza** si la línea está marcada como sucia). Si la línea se contó a mano, vuelven tantas como indiques, solo de las de ese pedido. De las que faltan, las perdidas pasan a **Perdida** y las dañadas a **En reparación**. El resto sigue fuera con su pedido.",
         "Si una unidad vuelve sin su caja, o la caja sin ella, se saca de la caja automáticamente.",
         "Cuando no queda nada pendiente, el pedido pasa a devuelto.",
+        "Si cerraste con material pendiente, la lista cerrada muestra cuánto falta y el botón **Recibir lo pendiente**: abre una nueva lista de retorno solo con lo que falta. Al cerrarla sin nada pendiente, el pedido pasa a devuelto.",
       ],
     },
     {

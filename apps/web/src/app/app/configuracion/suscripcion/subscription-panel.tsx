@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/menu";
 import { cn, formatDate, formatEUR } from "@/lib/utils";
 import { monthlyCost, PLANS, type PlanId } from "@/server/billing/plans";
+import { seatsError } from "@/server/billing/access";
 import { choosePlan, openBillingPortal } from "@/server/actions/settings";
 
 const STATUS: Record<string, { label: string; tone: "success" | "warning" | "danger" | "info" }> = {
@@ -25,6 +26,8 @@ export function SubscriptionPanel({ plan, status, seats, users, trialEndsAt, day
   const [n, setN] = useState(Math.max(users, seats));
   const [pending, start] = useTransition();
   const st = STATUS[status] ?? { label: status, tone: "info" as const };
+  const maxSeats = Math.max(...PLANS.map((p) => p.seats));
+  const tooFew = n < users;
   return (
     <div className="space-y-6">
       {flash && <p className="rounded-xl border bg-success-bg px-4 py-3 text-sm text-success" role="status">{flash}</p>}
@@ -46,25 +49,34 @@ export function SubscriptionPanel({ plan, status, seats, users, trialEndsAt, day
       </section>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <label className="flex items-center gap-2 text-sm"><Switch checked={annual} onCheckedChange={setAnnual} /> Pago anual <StatusPill tone="success" dot={false}>−20 %</StatusPill></label>
-        <label className="flex items-center gap-2 text-sm">Usuarios <Input type="number" min={users} max={500} value={n} onChange={(e) => setN(Math.max(1, Number(e.target.value)))} className="w-20" aria-label="Número de usuarios" /></label>
+        <div className="text-right">
+          <label className="flex items-center justify-end gap-2 text-sm">Usuarios <Input type="number" min={users} max={maxSeats} value={n} onChange={(e) => setN(Math.max(0, Math.floor(Number(e.target.value) || 0)))} onBlur={() => setN((v) => Math.min(maxSeats, Math.max(users, v)))} className="w-20" aria-label="Número de usuarios" aria-invalid={tooFew || undefined} /></label>
+          {tooFew && <p className="mt-1 text-xs text-danger">Ya tienes {users} usuarios: no puedes contratar menos plazas.</p>}
+        </div>
       </div>
       <div className="grid gap-4 md:grid-cols-3">
         {PLANS.map((p) => {
           const cost = monthlyCost(p.id as PlanId, n, annual);
           const current = p.id === plan && status === "active";
+          // seats must fit the plan: at least the current users, at most the plan maximum (Empresa is contracted with sales)
+          const seatProblem = p.id === "empresa" ? null : seatsError(p.id, n, users);
           return (
             <article key={p.id} className={cn("flex flex-col rounded-xl border bg-card p-5", p.id === "profesional" && "border-brand-300 ring-1 ring-brand-200")}>
               <h3 className="text-lg font-semibold">{p.name}</h3>
               <p className="mt-1 text-sm text-muted-foreground">{p.description}</p>
               <p className="mt-4 text-2xl font-semibold">{p.pricePerUser ? `${annual ? Math.round(p.pricePerUser * 0.8) : p.pricePerUser} €` : "A medida"}<span className="text-sm font-normal text-muted-foreground">{p.pricePerUser ? " / usuario / mes" : ""}</span></p>
-              {cost != null && <p className="text-xs text-muted-foreground">{formatEUR(cost)} al mes para {n} usuarios{annual ? ", facturado anualmente" : ""} · IVA no incluido</p>}
+              {seatProblem && !tooFew ? (
+                <p className="text-xs text-danger">{users > p.seats ? `Tienes ${users} usuarios y este plan admite hasta ${p.seats}.` : `Este plan admite hasta ${p.seats} usuarios.`}</p>
+              ) : (
+                cost != null && <p className="text-xs text-muted-foreground">{formatEUR(cost)} al mes para {n} usuarios{annual ? ", facturado anualmente" : ""} · IVA no incluido</p>
+              )}
               <ul className="mt-4 flex-1 space-y-1.5 text-sm">
                 {p.features.map((f) => <li key={f} className="flex gap-2"><Check className="mt-0.5 size-4 shrink-0 text-success" />{f}</li>)}
               </ul>
               <Button
                 className="mt-5"
                 variant={p.id === "profesional" ? "default" : "outline"}
-                disabled={pending || current}
+                disabled={pending || current || Boolean(seatProblem)}
                 onClick={() =>
                   p.id === "empresa"
                     ? router.push("/contacto")

@@ -270,3 +270,46 @@ export function unitWhere(u: { status: string; parent?: { name: string; serial: 
   if (u.status === "baja") return "Dada de baja";
   return place || "Almacén (sin ubicación)";
 }
+
+/**
+ * Serials for `count` new units of an item (SKU-001, SKU-002…), numbering from 1
+ * and skipping any serial or QR code already in use (case-insensitive), so an
+ * edited serial or a gap never makes a new unit collide with an existing one.
+ */
+export function nextSerials(sku: string, count: number, taken: Iterable<string>): { serial: string; qrCode: string }[] {
+  const used = new Set([...taken].map((t) => t.toUpperCase()));
+  const out: { serial: string; qrCode: string }[] = [];
+  for (let n = 1; out.length < count && n < 1_000_000; n++) {
+    const serial = `${sku}-${String(n).padStart(3, "0")}`;
+    const qrCode = `RV-${serial}`;
+    if (used.has(serial.toUpperCase()) || used.has(qrCode.toUpperCase())) continue;
+    out.push({ serial, qrCode });
+  }
+  return out;
+}
+
+/** What a return list still expects per item: what was not counted back, damaged or lost. */
+export function outstandingReturn(lines: { itemId: string; quantity: number; returned: number; damaged: number; lost: number }[]): { itemId: string; quantity: number }[] {
+  const m = new Map<string, number>();
+  for (const l of lines) {
+    const left = Math.round((l.quantity - l.returned - l.damaged - l.lost) * 100) / 100;
+    if (left > 0) m.set(l.itemId, (m.get(l.itemId) ?? 0) + left);
+  }
+  return [...m].map(([itemId, quantity]) => ({ itemId, quantity }));
+}
+
+/**
+ * Stock side effects of changing a serial unit's status by hand, so the unit and
+ * its item agree: a unit in the workshop holds one item in stockRepair through an
+ * open repair; a unit written off or lost is out of stockTotal.
+ */
+export function unitStatusEffects(from: string, to: string): { releaseRepair: boolean; openRepair: "reparacion" | "limpieza" | null; stockTotalDelta: -1 | 0 | 1 } {
+  const shop = (s: string) => s === "reparacion" || s === "limpieza";
+  const gone = (s: string) => s === "baja" || s === "perdida";
+  if (from === to) return { releaseRepair: false, openRepair: null, stockTotalDelta: 0 };
+  return {
+    releaseRepair: shop(from),
+    openRepair: to === "reparacion" || to === "limpieza" ? to : null,
+    stockTotalDelta: gone(from) && !gone(to) ? 1 : !gone(from) && gone(to) ? -1 : 0,
+  };
+}

@@ -43,7 +43,7 @@ export function NewInvoiceDialog({ orders, clients, defaultOrderId }: { orders: 
           </TabsList>
           <TabsContent value="pedido" className="space-y-4 pt-4">
             {orders.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No hay pedidos en opción, confirmados o en curso.</p>
+              <p className="text-sm text-muted-foreground">No hay pedidos en opción, confirmados, en curso o devueltos.</p>
             ) : (
               <>
                 <Field label="Pedido" htmlFor="ni-order">

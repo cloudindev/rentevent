@@ -14,6 +14,8 @@ import { tenantAction, UserError } from "../action";
 import { ACTIVE_TENANT_COOKIE } from "../context";
 import { installExampleCatalogue } from "../settings/catalog-template";
 import type { PlanId } from "../billing/plans";
+import { seatsError } from "../billing/access";
+import { assertApiIncluded, seatsInUse } from "../billing/tenant-access";
 
 const companyInput = z.object({
   name: z.string().trim().min(2).max(80),
@@ -99,6 +101,7 @@ export const saveQuoteTerms = tenantAction(z.object({ quoteTerms: z.string().max
 
 // ── API keys & webhooks
 export const createApiKey = tenantAction(z.object({ name: z.string().trim().min(2).max(60) }), "configuracion", async ({ name }, tx, ctx) => {
+  await assertApiIncluded(tx);
   const k = generateApiKey();
   const [row] = await tx.insert(apiKeys).values({ name, prefix: k.prefix, hash: k.hash, scopes: ["*"], createdBy: ctx.user.name }).returning({ id: apiKeys.id });
   await audit(tx, ctx, "api_key", row!.id, "crear", { nombre: name, prefijo: k.prefix });
@@ -117,6 +120,7 @@ export const saveWebhook = tenantAction(
   z.object({ id: z.string().uuid().nullable(), url: z.string().url("URL no válida").refine((u) => u.startsWith("https://") || process.env.NODE_ENV !== "production", "Debe ser https"), events: z.array(z.enum([...WEBHOOK_EVENTS, "*"])).min(1, "Elige al menos un evento"), active: z.boolean() }),
   "configuracion",
   async (input, tx, ctx) => {
+    await assertApiIncluded(tx);
     if (input.id) {
       await tx.update(webhooks).set({ url: input.url, events: input.events, active: input.active }).where(eq(webhooks.id, input.id));
       await audit(tx, ctx, "webhook", input.id, "editar");
@@ -139,6 +143,7 @@ export const deleteWebhook = tenantAction(z.object({ id: z.string().uuid() }), "
 });
 
 export const testWebhook = tenantAction(z.object({ id: z.string().uuid() }), "configuracion", async ({ id }, tx) => {
+  await assertApiIncluded(tx);
   const [h] = await tx.select().from(webhooks).where(eq(webhooks.id, id));
   if (!h) throw new UserError("Webhook no encontrado");
   const ok = await deliverToHook(tx, h, "ping", { message: "Prueba de Rentevent", webhook_id: id });
@@ -147,6 +152,7 @@ export const testWebhook = tenantAction(z.object({ id: z.string().uuid() }), "co
 });
 
 export const retryWebhookDelivery = tenantAction(z.object({ id: z.string().uuid() }), "configuracion", async ({ id }, tx) => {
+  await assertApiIncluded(tx);
   const r = await retryDelivery(tx, id);
   if (!r) throw new UserError("Entrega no encontrada");
   revalidatePath("/app/configuracion/api");
@@ -156,6 +162,8 @@ export const retryWebhookDelivery = tenantAction(z.object({ id: z.string().uuid(
 // ── Subscription
 export const choosePlan = tenantAction(z.object({ plan: z.enum(["basico", "profesional", "empresa"]), seats: z.coerce.number().int().min(1).max(500), annual: z.boolean() }), "configuracion", async (input, tx, ctx) => {
   if (input.plan === "empresa") throw new UserError("El plan Empresa se contrata con nuestro equipo: escríbenos desde /contacto.");
+  const bad = seatsError(input.plan, input.seats, (await seatsInUse(ctx.tenantId)).members);
+  if (bad) throw new UserError(bad);
   const [s] = await tx.select().from(tenantSettings);
   const r = await createCheckout({ tenantId: ctx.tenantId, slug: ctx.slug, email: ctx.user.email, plan: input.plan as PlanId, seats: input.seats, annual: input.annual, customerId: s?.stripeCustomerId ?? null });
   await audit(tx, ctx, "subscription", ctx.tenantId, "editar", { checkout: input.plan, modo: r.mode });

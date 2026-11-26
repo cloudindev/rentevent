@@ -7,6 +7,7 @@ import { notify } from "@/lib/adapters/messaging";
 import { env } from "@/lib/env";
 import { audit } from "../audit";
 import { tenantAction, UserError } from "../action";
+import { canManageAnnouncements } from "@/lib/permissions";
 
 const entity = z.enum(["order", "project", "contact"]);
 
@@ -86,6 +87,7 @@ export const saveAnnouncement = tenantAction(
   z.object({ id: z.string().uuid().nullable(), title: z.string().trim().min(2, "Pon un título").max(120), body: z.string().trim().min(2, "Escribe el aviso").max(4000), pinned: z.boolean() }),
   "ver",
   async ({ id, ...values }, tx, ctx) => {
+    if (!canManageAnnouncements(ctx.role)) throw new UserError("No tienes permiso para publicar avisos.");
     if (id) await tx.update(announcements).set(values).where(eq(announcements.id, id));
     else await tx.insert(announcements).values({ ...values, authorName: ctx.user.name });
     await audit(tx, ctx, "announcement", id ?? "nuevo", id ? "editar" : "crear", { titulo: values.title });
@@ -95,6 +97,7 @@ export const saveAnnouncement = tenantAction(
 );
 
 export const deleteAnnouncement = tenantAction(z.object({ id: z.string().uuid() }), "ver", async ({ id }, tx, ctx) => {
+  if (!canManageAnnouncements(ctx.role)) throw new UserError("No tienes permiso para borrar avisos.");
   await tx.delete(announcements).where(eq(announcements.id, id));
   await audit(tx, ctx, "announcement", id, "borrar");
   revalidatePath("/app/comunicacion");

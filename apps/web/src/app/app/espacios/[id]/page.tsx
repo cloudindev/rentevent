@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MapPin, Navigation } from "lucide-react";
-import { asc, contacts, desc, eq, projects, venues } from "@rentevent/db";
+import { asc, contacts, desc, eq, or, projects, venues } from "@rentevent/db";
 import { PageBody, PageHeader } from "@/components/app/page-header";
 import { StatusPill } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,7 +21,8 @@ export default async function VenuePage({ params }: { params: Promise<{ id: stri
     if (!v) return null;
     const [ps, cs] = await Promise.all([
       tx.select({ id: projects.id, name: projects.name, number: projects.number, status: projects.status, startsAt: projects.startsAt }).from(projects).where(eq(projects.venueId, id)).orderBy(desc(projects.startsAt)).limit(20),
-      tx.select({ id: contacts.id, name: contacts.name }).from(contacts).orderBy(asc(contacts.name)),
+      // archived contacts are not offered as owners (same as the list), except the current one
+      tx.select({ id: contacts.id, name: contacts.name }).from(contacts).where(v.contactId ? or(eq(contacts.archived, false), eq(contacts.id, v.contactId)) : eq(contacts.archived, false)).orderBy(asc(contacts.name)),
     ]);
     return { v, ps, cs, canEdit: can(ctx.role, "comercial") };
   });
@@ -86,7 +87,7 @@ export default async function VenuePage({ params }: { params: Promise<{ id: stri
           <CardHeader>
             <div>
               <CardTitle>Plano del recinto</CardTitle>
-              <p className="text-xs text-muted-foreground">Se usa en el configurador para colocar las carpas a escala.</p>
+              <p className="text-xs text-muted-foreground">Con la escala indicada, el configurador de los pedidos de este espacio puede ponerlo bajo las carpas (vista Plano → Plano del espacio).</p>
             </div>
             {data.canEdit && <PlanUpload venueId={v.id} metresPerPixel={v.metresPerPixel} />}
           </CardHeader>

@@ -1,9 +1,9 @@
 import "server-only";
-import { and, desc, eq, inspections, isNotNull, itemUnits, items, movements, repairs, sql, type Tx } from "@rentevent/db";
+import { and, asc, desc, eq, inArray, inspections, isNotNull, isNull, itemUnits, items, movements, repairs, sql, type Tx } from "@rentevent/db";
 import { UserError } from "../action";
 import { audit } from "../audit";
 import type { AppContext } from "../context";
-import { inspectionDue, type InspectionStatus } from "./logic";
+import { inspectionDue, UNIT_STATUS_LABEL, unitStatusEffects, type InspectionStatus } from "./logic";
 import { logUnitEvents } from "./tracking";
 
 type Ctx = Pick<AppContext, "user">;
@@ -55,6 +55,55 @@ export async function setRepairStatus(tx: Tx, ctx: Ctx, input: { id: string; sta
     }
   }
   await audit(tx, ctx, "repair", input.id, "estado", { de: r.status, a: input.status });
+}
+
+export type UnitStatus = "disponible" | "reparacion" | "limpieza" | "baja" | "perdida";
+
+/**
+ * Changes a serial unit's status by hand ("Marcar como") keeping the item's stock
+ * in step: entering the workshop opens a repair or cleaning (stockRepair +1),
+ * leaving it closes that repair (stockRepair −1), and baja / perdida take the unit
+ * out of stockTotal (recovering it puts it back).
+ */
+export async function changeUnitStatus(tx: Tx, ctx: Ctx, unitId: string, status: UnitStatus) {
+  const [u] = await tx.select().from(itemUnits).where(eq(itemUnits.id, unitId)).for("update");
+  if (!u) throw new UserError("Unidad no encontrada");
+  if (u.status === status) return u;
+  const fx = unitStatusEffects(u.status, status);
+  const change = `${UNIT_STATUS_LABEL[u.status] ?? u.status} → ${UNIT_STATUS_LABEL[status]}`;
+  const gone = status === "baja" || status === "perdida";
+  if (fx.releaseRepair) {
+    const note = `Cerrada al marcar la unidad ${u.serial} como ${UNIT_STATUS_LABEL[status]!.toLowerCase()}`;
+    // its own repair; failing that (units sent to the workshop as part of a bulk repair) one unit of an open bulk repair
+    const [own] = await tx.select().from(repairs).where(and(eq(repairs.unitId, unitId), inArray(repairs.status, OPEN))).orderBy(asc(repairs.createdAt)).limit(1);
+    const kind = u.status === "limpieza" ? "limpieza" : "reparacion";
+    const [bulk] = own ? [] : await tx.select().from(repairs).where(and(eq(repairs.itemId, u.itemId), isNull(repairs.unitId), eq(repairs.kind, kind), inArray(repairs.status, OPEN))).orderBy(asc(repairs.createdAt)).limit(1);
+    const r = own ?? bulk;
+    if (r) {
+      const take = own ? Number(r.quantity) : Math.min(1, Number(r.quantity));
+      const left = Number(r.quantity) - take;
+      if (left > 0) await tx.update(repairs).set({ quantity: left }).where(eq(repairs.id, r.id));
+      else await tx.update(repairs).set({ status: gone ? "baja" : "reparado", resolution: r.resolution ?? note, closedAt: new Date() }).where(eq(repairs.id, r.id));
+      await tx.update(items).set({ stockRepair: sql`greatest(0, ${items.stockRepair} - ${take})` }).where(eq(items.id, u.itemId));
+      await tx.insert(movements).values({ itemId: u.itemId, unitId, kind: "reparacion_baja", quantity: take, userId: ctx.user.id, note });
+      await audit(tx, ctx, "repair", r.id, "estado", left > 0 ? { cantidad: { de: Number(r.quantity), a: left }, unidad: u.serial } : { de: r.status, a: gone ? "baja" : "reparado" });
+    }
+  }
+  if (fx.stockTotalDelta !== 0) {
+    const d = fx.stockTotalDelta;
+    await tx.update(items).set({ stockTotal: d > 0 ? sql`${items.stockTotal} + 1` : sql`greatest(0, ${items.stockTotal} - 1)` }).where(eq(items.id, u.itemId));
+    await tx.insert(movements).values({ itemId: u.itemId, unitId, kind: d > 0 ? "ajuste" : "perdida", quantity: d, userId: ctx.user.id, note: d > 0 ? `Unidad ${u.serial} recuperada` : status === "baja" ? `Unidad ${u.serial} dada de baja` : `Unidad ${u.serial} perdida` });
+  }
+  // back in the warehouse (or written off) means it is no longer out on an order
+  await tx.update(itemUnits).set({ status, currentOrderId: status === "perdida" ? u.currentOrderId : null }).where(eq(itemUnits.id, unitId));
+  if (fx.openRepair) {
+    // logs its own event on the unit
+    await openRepair(tx, ctx, { itemId: u.itemId, unitId, quantity: 1, kind: fx.openRepair, reason: `Marcada a mano: ${change}` });
+  } else {
+    await logUnitEvents(tx, ctx, [unitId], "estado", { note: change });
+  }
+  await audit(tx, ctx, "item_unit", unitId, "estado", { status });
+  return { ...u, status };
 }
 
 /** Records an inspection; "no apto" automatically opens a repair. */

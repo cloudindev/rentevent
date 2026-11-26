@@ -13,6 +13,7 @@ import { QrScanner } from "@/components/crew/qr-scanner";
 import { Progress } from "@/components/warehouse/progress";
 import { cn, formatDateTime, formatNumber, formatRange } from "@/lib/utils";
 import { closeReturn, createDeliveryNote, markAll, markLoaded, scanCode, updatePickLine } from "@/server/actions/warehouse";
+import { OpenListButton } from "../open-list-button";
 import { PICK_STATUS_LABEL, PICK_STATUS_TONE, groupByLocation, listStatus, progress, type PickStatus } from "@/server/warehouse/logic";
 
 type Line = { id: string; itemId: string; name: string; sku: string; unit: string; kind: string; role: string; category: string; location: string | null; quantity: number; prepared: number; loaded: number; returned: number; damaged: number; lost: number; status: string; scannedUnits: string[] };
@@ -42,7 +43,7 @@ function Counter({ value, max, onChange, label, disabled, tone }: { value: numbe
   );
 }
 
-export function PickListDetail({ list, order, clientName, lines: initial, note, canWork, initialCode }: { list: { id: string; kind: "salida" | "retorno"; status: string; dueAt: string | null }; order: { id: string; number: string; title: string; status: string; periodStart: string; periodEnd: string } | null; clientName: string | null; lines: Line[]; note: { id: string; number: string; signed: boolean } | null; canWork: boolean; initialCode?: string | null }) {
+export function PickListDetail({ list, order, clientName, lines: initial, note, canWork, latest = true, initialCode }: { list: { id: string; kind: "salida" | "retorno"; status: string; dueAt: string | null }; order: { id: string; number: string; title: string; status: string; periodStart: string; periodEnd: string } | null; clientName: string | null; lines: Line[]; note: { id: string; number: string; signed: boolean } | null; canWork: boolean; latest?: boolean; initialCode?: string | null }) {
   const router = useRouter();
   const [lines, setLines] = useState(initial);
   const [scan, setScan] = useState(false);
@@ -136,7 +137,7 @@ export function PickListDetail({ list, order, clientName, lines: initial, note, 
               <Button variant={scan ? "secondary" : "outline"} size="sm" onClick={() => setScan((s) => !s)}>
                 {scan ? <X /> : <ScanLine />} {scan ? "Cerrar escáner" : "Escanear"}
               </Button>
-              <Button variant="outline" size="sm" disabled={pending} onClick={() => start(async () => { const r = await markAll({ listId: list.id, field: isOut ? "prepared" : "returned" }); if (!r.ok) toast.error(r.error); router.refresh(); setLines((ls) => ls.map((l) => (isOut ? { ...l, prepared: l.quantity } : { ...l, returned: Math.max(0, l.quantity - l.damaged - l.lost) }))); })}>
+              <Button variant="outline" size="sm" disabled={pending} onClick={() => start(async () => { const r = await markAll({ listId: list.id, field: isOut ? "prepared" : "returned" }); if (!r.ok) { toast.error(r.error); return; } router.refresh(); setLines((ls) => ls.map((l) => (isOut ? { ...l, prepared: l.quantity } : { ...l, returned: Math.max(0, l.quantity - l.damaged - l.lost) }))); })}>
                 <CheckCheck /> {isOut ? "Todo preparado" : "Todo devuelto"}
               </Button>
               {isOut ? (
@@ -148,6 +149,12 @@ export function PickListDetail({ list, order, clientName, lines: initial, note, 
                   <CheckCheck /> Cerrar retorno
                 </Button>
               )}
+            </div>
+          )}
+          {canWork && closed && !isOut && latest && order?.status === "en_curso" && missingTotal > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-warning">Faltan {formatNumber(missingTotal)} por volver</span>
+              <OpenListButton orderId={order.id} kind="retorno" label="Recibir lo pendiente" />
             </div>
           )}
           <div className="flex flex-wrap gap-2">
@@ -249,7 +256,7 @@ export function PickListDetail({ list, order, clientName, lines: initial, note, 
           </dl>
           {missingTotal > 0 && (
             <label className="flex items-center gap-2 text-sm">
-              <Switch checked={missingAsLost} onCheckedChange={setMissingAsLost} /> Dar por perdido lo que falta (si no, el pedido sigue en obra)
+              <Switch checked={missingAsLost} onCheckedChange={setMissingAsLost} /> Dar por perdido lo que falta (si no, el pedido sigue en obra y podrás recibirlo después con «Recibir lo pendiente»)
             </label>
           )}
           <DialogFooter>
@@ -263,7 +270,7 @@ export function PickListDetail({ list, order, clientName, lines: initial, note, 
                     toast.error(r.error);
                     return;
                   }
-                  toast.success(r.data.orderReturned ? "Retorno cerrado: pedido devuelto" : "Retorno cerrado con material pendiente");
+                  toast.success(r.data.orderReturned ? "Retorno cerrado: pedido devuelto" : "Retorno cerrado con material pendiente: recíbelo con «Recibir lo pendiente»");
                   setCloseOpen(false);
                   router.refresh();
                 })

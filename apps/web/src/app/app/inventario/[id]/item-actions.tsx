@@ -89,6 +89,8 @@ export function ItemActions({ item, canEdit, canCount }: { item: ItemFormValues 
                     toast.error(r.error);
                     return;
                   }
+                  if (r.data.count < n) toast.warning(`Se han creado ${r.data.count} de ${n} unidades: algunos números de serie ya existían.`);
+                  else toast.success(r.data.count === 1 ? "Unidad creada" : `${r.data.count} unidades creadas`);
                   setUnits(false);
                   router.refresh();
                 })

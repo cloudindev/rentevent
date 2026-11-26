@@ -311,7 +311,7 @@ export async function projectMargins(tx: Tx, limit = 25): Promise<ProjectMargin[
     tx
       .select({ projectId: subrentals.projectId, cost: sql<number>`coalesce(sum(${subrentals.cost}), 0)::float` })
       .from(subrentals)
-      .where(inArray(subrentals.projectId, ids))
+      .where(and(inArray(subrentals.projectId, ids), ne(subrentals.status, "cancelado")))
       .groupBy(subrentals.projectId),
     tx
       .select({ projectId: purchases.projectId, cost: sql<number>`coalesce(sum(${purchases.base}), 0)::float` })

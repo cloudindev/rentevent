@@ -35,7 +35,17 @@ export default function TentPlan({ composition, families, editable, selectedTent
     img.src = url;
   }, [site?.imageUrl]);
 
-  const viewBox = frozenViewBox ?? model.viewBox;
+  // with a venue plan behind, frame the whole plan as well as the tents
+  const fitViewBox = useMemo<[number, number, number, number]>(() => {
+    const vb = model.viewBox;
+    if (!site?.metresPerPixel || !siteSize) return vb;
+    const x0 = Math.min(vb[0], site.offsetX);
+    const y0 = Math.min(vb[1], site.offsetY);
+    const x1 = Math.max(vb[0] + vb[2], site.offsetX + siteSize.w * site.metresPerPixel);
+    const y1 = Math.max(vb[1] + vb[3], site.offsetY + siteSize.h * site.metresPerPixel);
+    return [x0, y0, x1 - x0, y1 - y0];
+  }, [model.viewBox, site?.metresPerPixel, site?.offsetX, site?.offsetY, siteSize]);
+  const viewBox = frozenViewBox ?? fitViewBox;
 
   const toPlan = (e: React.PointerEvent) => {
     const svg = localRef.current!;
@@ -60,7 +70,7 @@ export default function TentPlan({ composition, families, editable, selectedTent
     const t = composition.tents.find((x) => x.id === id)!;
     const p = toPlan(e);
     (e.target as Element).setPointerCapture?.(e.pointerId);
-    setFrozenViewBox(model.viewBox);
+    setFrozenViewBox(fitViewBox);
     setDrag({ kind, id, startX: p.x, startY: p.y, origX: t.placement.x, origY: t.placement.y, origRot: t.placement.rotation });
   };
 

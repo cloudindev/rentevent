@@ -26,7 +26,7 @@ export const area: HelpArea = {
       path: "/app/proyectos",
       steps: [
         { title: "Abre el listado", text: "Pulsa **Proyectos** en el menú lateral. Los proyectos se ordenan por fecha de inicio, del más reciente al más antiguo." },
-        { title: "Lee las columnas", text: "La tabla muestra **Nº**, **Proyecto**, **Cliente**, **Fechas**, **Estado**, **Pedidos** (cuántos tiene) y **Valor**, que suma el último presupuesto de cada pedido no cancelado." },
+        { title: "Lee las columnas", text: "La tabla muestra **Nº**, **Proyecto**, **Cliente**, **Fechas**, **Estado**, **Pedidos** (cuántos tiene) y **Valor (sin IVA)**, que suma la base imponible del último presupuesto de cada pedido no cancelado." },
         { title: "Busca y filtra", text: "Escribe en **Buscar proyecto o cliente…** y usa el desplegable **Estado: todos** para ver solo un estado." },
         { title: "Guarda la vista", text: "Abre **Vistas** y pulsa **Guardar vista actual** para conservar búsqueda, orden, filtros y columnas visibles." },
         { title: "Abre un proyecto", text: "Pulsa cualquier fila para ir a su ficha." },
@@ -53,11 +53,28 @@ export const area: HelpArea = {
       summary: "Qué información encuentras en la ficha y a dónde lleva cada enlace.",
       path: "/app/proyectos/[id]",
       steps: [
-        { title: "Cabecera", text: "Muestra número y nombre, las fechas de inicio y fin y la etiqueta de estado." },
+        { title: "Cabecera", text: "Muestra número y nombre, las fechas de inicio y fin, la etiqueta de estado y, si tu rol puede, los botones **Editar** y **Duplicar (recurrente)**." },
         { title: "Resumen", text: "Cuatro tarjetas indican el **Cliente** (enlaza a su ficha), el **Lugar**, los **Pedidos** activos con su importe sin IVA y el **Personal** con el número de turnos y de personas." },
-        { title: "Pedidos", text: "La tarjeta **Pedidos** lista cada pedido con número, título, importe del último presupuesto y estado. Pulsa uno para abrirlo." },
+        { title: "Pedidos", text: "La tarjeta **Pedidos** lista cada pedido con número, título, importe sin IVA del último presupuesto y estado. Pulsa uno para abrirlo." },
         { title: "Personal y transporte", text: "Lista los turnos del proyecto con la fase, la hora, las personas asignadas sobre las necesarias y el vehículo. Pulsa **Abrir tablero de planificación** para gestionarlos en Personal." },
         { title: "Historial de cambios", text: "En la columna derecha verás quién ha creado, editado o cambiado de estado el proyecto y sus pedidos." },
+      ],
+    },
+    {
+      slug: "editar-el-proyecto",
+      title: "Editar nombre, cliente, lugar y descripción",
+      summary: "Corrige los datos generales del proyecto desde su ficha.",
+      path: "/app/proyectos/[id]",
+      roles: "Administrador, Comercial",
+      steps: [
+        { title: "Abre el editor", text: "En la cabecera de la ficha pulsa **Editar**. Se abre el panel **Editar proyecto**." },
+        { title: "Cambia los datos", text: "Modifica **Nombre**, **Cliente**, **Lugar** y **Descripción**." },
+        { title: "Guarda", text: "Pulsa **Guardar**. Verás el aviso \"Proyecto actualizado\"." },
+      ],
+      notes: [
+        "El lugar lo comparten todos los pedidos del proyecto. Al cambiarlo, la distancia se vuelve a calcular con la nueva dirección.",
+        "Al cambiar el cliente, los pedidos abiertos que tenían el cliente anterior (o ninguno) pasan al nuevo. Los pedidos Devueltos o Cancelados no cambian.",
+        "Las fechas del proyecto no se editan aquí: salen de sus pedidos. Las fases se ajustan en el Cronograma.",
       ],
     },
     {
@@ -73,7 +90,7 @@ export const area: HelpArea = {
         { title: "Guarda", text: "Pulsa **Guardar**. El cronograma, el Inicio y la Agenda se actualizan." },
       ],
       notes: [
-        "Si después cambias la carga o el retorno de un pedido del proyecto, las fases se vuelven a generar desde ese pedido y se pierden los ajustes manuales.",
+        "Si después cambias las fechas de un pedido del proyecto, solo se mueven las fases que se generaron desde ese pedido y que no has tocado. Tus ajustes manuales se conservan.",
         "Solo las fases de Montaje, Evento y Desmontaje aparecen en la Agenda. En Inicio se muestran Carga, Montaje, Desmontaje y Retorno.",
       ],
     },
@@ -115,7 +132,7 @@ export const area: HelpArea = {
         { title: "Abre o elimina archivos", text: "Pulsa el nombre para abrirlo. Con la papelera lo eliminas." },
         { title: "Escribe notas", text: "En **Notas**, escribe en **Escribe una nota interna…** y pulsa el botón de guardar. Las notas quedan con tu nombre y la fecha." },
       ],
-      notes: ["Subir y eliminar archivos requiere el rol Administrador o Comercial."],
+      notes: ["Las tareas las pueden añadir, marcar y borrar todos los roles salvo Solo lectura y Montador. Subir y eliminar archivos requiere el rol Administrador o Comercial."],
     },
     {
       slug: "rentabilidad",
@@ -125,8 +142,8 @@ export const area: HelpArea = {
       roles: "Administrador, Comercial",
       steps: [
         { title: "Localiza la tarjeta", text: "En la columna derecha de la ficha verás **Rentabilidad**, solo si tu rol puede ver márgenes." },
-        { title: "Ingresos", text: "La primera línea es **Presupuestado (sin IVA)** o, cuando lo facturado ya lo supera, **Facturado (sin IVA)**." },
-        { title: "Costes", text: "Se restan **Personal**, **Transporte y costes de línea**, **Subalquileres** y **Compras imputadas**. El personal aparece como \"(fichado)\" si hay horas fichadas o como \"(previsto)\" si se calcula con los turnos planificados." },
+        { title: "Ingresos", text: "La primera línea es **Presupuestado (sin IVA)**, la base imponible del último presupuesto de cada pedido, o, cuando lo facturado ya lo supera, **Facturado (sin IVA)**." },
+        { title: "Costes", text: "Se restan **Personal**, **Transporte y costes de línea**, **Subalquileres** (sin los cancelados) y **Compras imputadas**. El personal aparece como \"(fichado)\" si hay horas fichadas o como \"(previsto)\" si se calcula con los turnos planificados." },
         { title: "Margen", text: "Al final verás el **Margen** en euros y porcentaje, en verde o en rojo si es negativo." },
       ],
       notes: ["Los pedidos cancelados no cuentan en los ingresos. Las facturas en borrador o anuladas tampoco."],

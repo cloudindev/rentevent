@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkAssignment, hasBlockingConflict, shiftNeed, suggestCrew, weekStart, type ShiftInfo, type WorkerInfo } from ".";
+import { canDrive, checkAssignment, hasBlockingConflict, shiftNeed, suggestCrew, weekStart, type ShiftInfo, type WorkerInfo } from ".";
 
 const H = 3_600_000;
 const T = Date.UTC(2026, 11, 14, 7); // Monday
@@ -56,5 +56,16 @@ describe("crew conflicts", () => {
     expect(shiftNeed("transporte", 1, 4, 2).requiredSkills).toEqual(["conductor_c"]);
     expect(shiftNeed("carga", 2, 2, 0).people).toBe(2);
     expect(new Date(weekStart(T + 3 * 24 * H)).getUTCDay()).toBe(1);
+  });
+});
+
+describe("canDrive", () => {
+  it("lets a higher licence drive smaller vehicles", () => {
+    expect(canDrive(["conductor_ce"], "conductor_b")).toBe(true);
+    expect(canDrive(["conductor_ce"], "conductor_c")).toBe(true);
+    expect(canDrive(["conductor_c"], "conductor_b")).toBe(true);
+    expect(canDrive(["conductor_b"], "conductor_c")).toBe(false);
+    expect(canDrive(["conductor_c"], "conductor_ce")).toBe(false);
+    expect(canDrive(["montador"], "conductor_b")).toBe(false);
   });
 });

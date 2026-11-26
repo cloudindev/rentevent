@@ -63,7 +63,7 @@ export const area: HelpArea = {
         { title: "Correos", text: "La tarjeta **Correos** muestra los correos vinculados al contacto o enviados desde o hacia su dirección. Pulsa uno para abrirlo en Emails." },
         { title: "Datos, notas e historial", text: "En la columna derecha tienes **Datos**, **Direcciones**, **Personas de contacto**, **Notas** e **Historial** de cambios." },
       ],
-      notes: ["Las tarjetas de pedidos y facturas muestran como máximo los 30 más recientes."],
+      notes: ["Los indicadores cuentan todos los pedidos y facturas del contacto. Las tarjetas Pedidos y Facturas listan los 30 más recientes; si hay más, su cabecera lo indica."],
     },
     {
       slug: "editar-un-contacto",
@@ -120,7 +120,7 @@ export const area: HelpArea = {
         { title: "Encuéntralo después", text: "En el listado usa el filtro **Estado** y elige **Archivados**." },
         { title: "Recupéralo", text: "Abre su ficha y pulsa **Recuperar**." },
       ],
-      notes: ["Los contactos no se borran: se archivan. Sus pedidos, facturas y notas se conservan."],
+      notes: ["Los contactos no se borran: se archivan. Sus pedidos, facturas y notas se conservan.", "Un cliente archivado deja de aparecer en las listas para elegir cliente al crear o editar pedidos y proyectos (salvo en los que ya lo tienen)."],
     },
     {
       slug: "notas-del-contacto",

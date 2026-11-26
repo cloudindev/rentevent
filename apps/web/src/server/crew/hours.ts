@@ -75,3 +75,25 @@ export function trainingStatus(expires: string | null, today = new Date()): Trai
   const soon = madridDay(new Date(today.getTime() + 30 * 86_400_000));
   return expires <= soon ? "proxima" : "vigente";
 }
+
+export type ReportLike = { workerName: string; checklist: { label: string; done: boolean }[]; incidents: string | null; clientName: string | null; clientSignature: string | null; completedAt: Date | null; updatedAt: Date };
+
+/**
+ * One crew-level view of the job reports of a shift (each worker fills their own):
+ * a checklist item is done if anyone ticked it, every worker's incidents are kept with
+ * their name, and the client name / signature come from the latest report that has them.
+ */
+export function mergeShiftReports(reports: ReportLike[], defaultChecklist: string[]) {
+  const latest = [...reports].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+  const labels = new Map<string, boolean>();
+  const source = reports.some((r) => r.checklist.length) ? reports.flatMap((r) => r.checklist) : defaultChecklist.map((label) => ({ label, done: false }));
+  for (const c of source) labels.set(c.label, (labels.get(c.label) ?? false) || c.done);
+  const signed = latest.find((r) => r.clientSignature) ?? null;
+  return {
+    checklist: [...labels].map(([label, done]) => ({ label, done })),
+    incidents: reports.filter((r) => r.incidents?.trim()).map((r) => ({ workerName: r.workerName, text: r.incidents!.trim() })),
+    clientName: signed?.clientName ?? latest.find((r) => r.clientName)?.clientName ?? null,
+    clientSignature: signed?.clientSignature ?? null,
+    completed: reports.filter((r) => r.completedAt).length,
+  };
+}

@@ -72,7 +72,7 @@ export const area: HelpArea = {
       roles: "Administrador, Comercial",
       steps: [
         { title: "Edita", text: "En la ficha del espacio, pulsa **Editar**. Se abre el mismo formulario que al crearlo." },
-        { title: "Cambia y guarda", text: "Modifica lo que necesites y pulsa **Guardar**.", tip: "Cada vez que guardas, el espacio se vuelve a ubicar con la dirección y el municipio actuales. Si cambias la dirección, revisa que la ubicación sea correcta en Cómo llegar." },
+        { title: "Cambia y guarda", text: "Modifica lo que necesites y pulsa **Guardar**.", tip: "El espacio solo se vuelve a ubicar si cambias la dirección o el municipio (o si aún no estaba ubicado). Si la búsqueda falla, se conserva la ubicación anterior: revisa que sea correcta en Cómo llegar." },
         { title: "Elimina", text: "Pulsa **Eliminar** y confirma \"¿Eliminar este espacio? Los proyectos que lo usan quedarán sin espacio.\". Vuelves a la lista de espacios.", tip: "Los proyectos y pedidos no se borran: solo se quedan sin lugar, y con él pierden la restricción de montar con pesos." },
       ],
     },
@@ -88,6 +88,7 @@ export const area: HelpArea = {
         { title: "Indica la escala", text: "En **Metros por píxel** escribe cuántos metros representa un píxel, por ejemplo 0,05 si 20 píxeles son 1 metro.", tip: "Para calcularla, mide en la imagen cuántos píxeles ocupa una distancia conocida y divide los metros entre los píxeles." },
         { title: "Sube", text: "Pulsa **Subir**. Verás \"Plano actualizado\" y la imagen aparece en la tarjeta con su escala, por ejemplo \"Escala: 1 px = 0.05 m\", o \"Sin escala definida\" si la dejaste vacía." },
         { title: "Sustituye el plano", text: "Para cambiarlo, vuelve a pulsar **Subir plano**: la nueva imagen y la nueva escala sustituyen a las anteriores." },
+        { title: "Úsalo en el configurador", text: "En un pedido de este espacio, abre la carpa, pasa a la vista **Plano** y pulsa **Plano del espacio**: el plano se dibuja a escala bajo las carpas y puedes arrastrarlas encima.", tip: "Solo aparece si el plano tiene escala. Si después subes otro plano, quita y vuelve a poner el plano del espacio en el configurador para usar el nuevo." },
       ],
     },
     {

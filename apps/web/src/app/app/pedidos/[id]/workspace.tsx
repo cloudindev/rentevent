@@ -112,9 +112,13 @@ export function OrderWorkspace({ data, perms }: { data: OrderWorkspaceData; perm
         <span className="text-xs text-muted-foreground" aria-live="polite">
           {saving ? "Guardando…" : dirty ? "Cambios sin guardar" : "Guardado"}
         </span>
-        <button onClick={() => setHeaderOpen(true)} className="rounded-lg hover:bg-accent" aria-label="Editar fechas y datos del pedido">
+        {editable ? (
+          <button onClick={() => setHeaderOpen(true)} className="rounded-lg hover:bg-accent" aria-label="Editar fechas y datos del pedido">
+            <DateChip>{formatRange(order.periodStart, order.periodEnd)}</DateChip>
+          </button>
+        ) : (
           <DateChip>{formatRange(order.periodStart, order.periodEnd)}</DateChip>
-        </button>
+        )}
         <StatusMenu orderId={order.id} status={order.status} canConfirm={perms.confirm} canEdit={perms.edit} optionExpiresAt={order.optionExpiresAt} dirty={dirty || saving} />
       </PageHeader>
       <div className="grid gap-5 p-4 md:p-6 xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -158,18 +162,19 @@ export function OrderWorkspace({ data, perms }: { data: OrderWorkspaceData; perm
               <dd><a className="hover:underline" href={`/app/proyectos/${order.projectId}`}>{order.projectName}</a></dd>
               <dt className="text-muted-foreground">Cliente</dt>
               <dd>{order.clientName ?? "—"}</dd>
-              <dt className="text-muted-foreground">Lugar</dt>
+              <dt className="text-muted-foreground" title="Es el lugar del proyecto: lo comparten todos sus pedidos">Lugar del proyecto</dt>
               <dd>{order.venueName ?? "—"}{!order.anchoringAllowed && <span className="block text-xs text-warning">No se puede anclar: usar pesos</span>}</dd>
               <dt className="text-muted-foreground">Evento</dt>
               <dd>{formatRange(order.eventStart, order.eventEnd)}</dd>
-              <dt className="text-muted-foreground">Distancia</dt>
+              <dt className="text-muted-foreground" title="Es la distancia del proyecto: la comparten todos sus pedidos">Distancia</dt>
               <dd>{order.distanceKm != null ? `${Math.round(order.distanceKm)} km` : "—"}</dd>
             </dl>
-            {perms.edit && <button className="mt-3 text-link hover:underline" onClick={() => setHeaderOpen(true)}>Editar datos y fechas</button>}
+            {editable && <button className="mt-3 text-link hover:underline" onClick={() => setHeaderOpen(true)}>Editar datos y fechas</button>}
+            {perms.edit && !editable && <p className="mt-3 text-xs text-muted-foreground">Pedido cerrado: reábrelo desde el estado para editar sus datos.</p>}
           </section>
         </aside>
       </div>
-      <HeaderSheet open={headerOpen} onOpenChange={setHeaderOpen} order={order} clients={data.clients} venues={data.venues} />
+      {editable && <HeaderSheet open={headerOpen} onOpenChange={setHeaderOpen} order={order} clients={data.clients} venues={data.venues} />}
     </>
   );
 }

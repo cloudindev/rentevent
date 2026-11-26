@@ -23,8 +23,12 @@ export type Catalog = {
   vehicles: VehicleType[];
 };
 
-/** Loads everything the BOM engine, the 3D viewer and pricing need (tenant-scoped). */
-export async function loadCatalog(tx: Tx, opts: { includeInactive?: boolean } = {}): Promise<Catalog> {
+/**
+ * Loads everything the BOM engine, the 3D viewer and pricing need (tenant-scoped).
+ * `includeInactive` keeps inactive families and items; `includeInactiveFamilies` keeps only
+ * inactive families (orders that already use one must still render and save).
+ */
+export async function loadCatalog(tx: Tx, opts: { includeInactive?: boolean; includeInactiveFamilies?: boolean } = {}): Promise<Catalog> {
   const [fams, rules, its, vehs] = await Promise.all([
     tx.select().from(structureFamilies).orderBy(asc(structureFamilies.sortOrder), asc(structureFamilies.width)),
     tx.select().from(bomRules).orderBy(asc(bomRules.sortOrder)),
@@ -33,7 +37,7 @@ export async function loadCatalog(tx: Tx, opts: { includeInactive?: boolean } = 
   ]);
   return {
     families: fams
-      .filter((f) => opts.includeInactive || f.active)
+      .filter((f) => opts.includeInactive || opts.includeInactiveFamilies || f.active)
       .map((f) => ({
         id: f.id,
         code: f.code,

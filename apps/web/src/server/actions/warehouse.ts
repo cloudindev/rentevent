@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { and, deliveryNotes, eq, inArray, items, orders, pickListLines, pickLists } from "@rentevent/db";
+import { and, deliveryNotes, eq, inArray, items, ne, orders, pickListLines, pickLists } from "@rentevent/db";
 import { tenantAction, UserError } from "../action";
 import { audit } from "../audit";
 import { nextCounter } from "../numbering";
@@ -44,6 +44,7 @@ export const updatePickLine = tenantAction(
 export const markAll = tenantAction(z.object({ listId: id, field: z.enum(["prepared", "loaded", "returned"]) }), "almacen", async ({ listId, field }, tx, ctx) => {
   const data = await loadPickList(tx, listId);
   if (!data) throw new UserError("Lista no encontrada");
+  if (data.list.status === "en_obra" || (data.list.kind === "retorno" && data.list.status === "devuelto")) throw new UserError("La lista ya está cerrada.");
   for (const l of data.lines) {
     if (field === "returned") await tx.update(pickListLines).set({ returned: Math.max(0, l.quantity - l.damaged - l.lost) }).where(eq(pickListLines.id, l.id));
     else await tx.update(pickListLines).set(field === "loaded" ? { prepared: l.quantity, loaded: l.quantity } : { prepared: l.quantity }).where(eq(pickListLines.id, l.id));
@@ -189,11 +190,11 @@ export const signDeliveryNote = tenantAction(
   },
 );
 
-/** Orders whose lists can be opened from the warehouse lists. */
+/** Orders whose lists can be opened from the warehouse lists (for returns: also partial returns with material still out). */
 export const ordersWithoutList = tenantAction(z.object({ kind: z.enum(["salida", "retorno"]) }), "almacen", async ({ kind }, tx) => {
   const statuses = kind === "salida" ? ["confirmado", "opcion"] : ["en_curso"];
   const rows = await tx.select({ id: orders.id, number: orders.number, title: orders.title, periodStart: orders.periodStart, periodEnd: orders.periodEnd }).from(orders).where(inArray(orders.status, statuses));
-  const lists = await tx.select({ orderId: pickLists.orderId }).from(pickLists).where(eq(pickLists.kind, kind));
+  const lists = await tx.select({ orderId: pickLists.orderId }).from(pickLists).where(kind === "retorno" ? and(eq(pickLists.kind, kind), ne(pickLists.status, "devuelto")) : eq(pickLists.kind, kind));
   const have = new Set(lists.map((l) => l.orderId));
   return rows.filter((r) => !have.has(r.id));
 });

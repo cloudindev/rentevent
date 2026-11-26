@@ -32,6 +32,7 @@ export const area: HelpArea = {
       notes: [
         "Qué puede responder: qué carpa puedes montar en unas fechas (anclada o con pesos), unidades libres de un artículo, personal sin turnos ni ausencias en un día, pedidos de un periodo y facturación emitida, cobrada y pendiente de un mes.",
         "Cada pregunta admite hasta 2.000 caracteres.",
+        "El asistente respeta tus permisos: la facturación solo la consulta quien tiene permiso de Finanzas, y los borradores de pedido solo los crea quien puede gestionar pedidos.",
       ],
     },
     {

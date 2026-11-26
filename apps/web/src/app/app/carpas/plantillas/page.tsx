@@ -5,6 +5,7 @@ import { PageBody, PageHeader } from "@/components/app/page-header";
 import { EmptyState } from "@/components/ui/empty";
 import { loadCatalog } from "@/server/catalog";
 import { tenantDb } from "@/server/context";
+import { can } from "@/lib/permissions";
 import { formatDate } from "@/lib/utils";
 import { CarpasTabs } from "../tabs";
 import { TemplateActions } from "./template-actions";
@@ -12,7 +13,7 @@ import { TemplateActions } from "./template-actions";
 export const metadata = { title: "Plantillas de carpa" };
 
 export default async function TemplatesPage() {
-  const { templates, cat } = await tenantDb(async (tx) => ({ templates: await tx.select().from(tentTemplates).orderBy(desc(tentTemplates.createdAt)), cat: await loadCatalog(tx, { includeInactive: true }) }));
+  const { templates, cat, canUse } = await tenantDb(async (tx, ctx) => ({ templates: await tx.select().from(tentTemplates).orderBy(desc(tentTemplates.createdAt)), cat: await loadCatalog(tx, { includeInactive: true }), canUse: can(ctx.role, "comercial") }));
   const famName = (id: string) => cat.families.find((f) => f.id === id);
   return (
     <>
@@ -41,7 +42,7 @@ export default async function TemplatesPage() {
                   </ul>
                   <div className="mt-4 flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">{formatDate(t.createdAt)}</span>
-                    <TemplateActions id={t.id} />
+                    {canUse && <TemplateActions id={t.id} />}
                   </div>
                 </article>
               );

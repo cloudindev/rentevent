@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState, useTransition } from "react";
-import { Box, Download, Layers, Minus, Plus, Save, Search, Split, Truck } from "lucide-react";
+import { Box, Download, Layers, Map as MapIcon, Minus, Plus, Save, Search, Split, Truck } from "lucide-react";
 import { toast } from "sonner";
 import {
   ANCHORING_LABELS,
@@ -13,6 +13,7 @@ import {
   SIDE_LABELS,
   suggestAlternatives,
   transferConfiguration,
+  validateConfiguration,
   type Alternative,
   type Anchoring,
   type FrontMaterial,
@@ -27,6 +28,7 @@ import {
   type TentConfiguration,
 } from "@rentevent/core";
 import { TentPlan, TentViewer, type TentViewerApi } from "@/components/tent3d";
+import { buildPlanModel } from "@/components/tent3d/plan-svg";
 import { Button } from "@/components/ui/button";
 import { Field, Input, NativeSelect } from "@/components/ui/input";
 import { Switch } from "@/components/ui/menu";
@@ -92,7 +94,8 @@ export function TentConfigurator({
   const shortages = [...checks.values()].filter((c) => c.shortage > 0 && bomItems.has(c.itemId));
   const alternatives = useMemo<Alternative[]>(() => {
     if (!shortages.length || !tent || !family) return [];
-    return suggestAlternatives({ config: tent.config, family, catalog: { families: catalogue.families, rules: catalogue.rules, items: catalogue.items }, available }).filter((a) => a.kind !== "subalquiler");
+    // inactive families are kept only so existing tents still work: never suggest them
+    return suggestAlternatives({ config: tent.config, family, catalog: { families: catalogue.families.filter((f) => f.active !== false), rules: catalogue.rules, items: catalogue.items }, available }).filter((a) => a.kind !== "subalquiler");
   }, [shortages.length, tent, family, catalogue, available]);
 
   if (!tent || !family || !cfg) return null;
@@ -117,6 +120,23 @@ export function TentConfigurator({
       onChange({ ...line, composition: { ...line.composition, tents: [...line.composition.tents.map((t) => (t.id === tent.id ? first : t)), second], gutters: [...line.composition.gutters, { a: tent.id, b: second.id, length: family.width }] } });
       toast.success("Carpa partida en dos, unidas con canalón");
     }
+  };
+
+  // places the venue plan (at its scale) centred under the current tents, or removes it
+  const toggleSite = () => {
+    if (line.composition.site) return onChange({ ...line, composition: { ...line.composition, site: null } });
+    const plan = order.sitePlan;
+    if (!plan) return;
+    const img = new Image();
+    img.onload = () => {
+      const b = buildPlanModel(line.composition, catalogue.families).bounds;
+      const w = img.naturalWidth * plan.metresPerPixel;
+      const h = img.naturalHeight * plan.metresPerPixel;
+      const site = { imageUrl: plan.imageUrl, metresPerPixel: plan.metresPerPixel, offsetX: Math.round((b.minX + b.maxX) / 2 - w / 2), offsetY: Math.round((b.minY + b.maxY) / 2 - h / 2), rotation: 0 };
+      onChange({ ...line, composition: { ...line.composition, site } });
+    };
+    img.onerror = () => toast.error("No se ha podido cargar el plano del espacio");
+    img.src = plan.imageUrl;
   };
 
   const sideAll = (side: SideType) => setConfig({ ...cfg, bays: cfg.bays.map((b) => ({ ...b, left: side, right: side })) });
@@ -153,6 +173,11 @@ export function TentConfigurator({
         <div className="ml-auto flex gap-1">
           <Button size="sm" variant={view === "3d" ? "secondary" : "ghost"} onClick={() => setView("3d")}><Box /> 3D</Button>
           <Button size="sm" variant={view === "plano" ? "secondary" : "ghost"} onClick={() => setView("plano")}><Layers /> Plano</Button>
+          {view === "plano" && editable && (order.sitePlan || line.composition.site) && (
+            <Button size="sm" variant="ghost" onClick={toggleSite} title="Dibuja el plano del espacio a escala bajo las carpas">
+              <MapIcon /> {line.composition.site ? "Quitar plano del espacio" : "Plano del espacio"}
+            </Button>
+          )}
         </div>
       </header>
       <div className="grid gap-0 2xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -176,8 +201,8 @@ export function TentConfigurator({
             <>
               <Field label="Familia" htmlFor="tc-fam">
                 <NativeSelect id="tc-fam" value={family.id} onChange={(e) => setConfig(transferConfiguration(cfg, catalogue.families.find((f) => f.id === e.target.value)!))}>
-                  {catalogue.families.map((f) => (
-                    <option key={f.id} value={f.id}>{f.name}</option>
+                  {catalogue.families.filter((f) => f.active !== false || f.id === family.id).map((f) => (
+                    <option key={f.id} value={f.id}>{f.name}{f.active === false ? " (inactiva)" : ""}</option>
                   ))}
                 </NativeSelect>
               </Field>
@@ -286,6 +311,8 @@ export function TentConfigurator({
                       </span>
                     )}
                   </div>
+                  {/* saving is not blocked (resizing the tent must not lock the order), so warn here */}
+                  {validateConfiguration(cfg, family).some((i) => i.path === "interior.stage") && <p className="mt-1 text-xs text-warning">El escenario no cabe dentro de la carpa</p>}
                 </Field>
               </div>
               <div className="grid grid-cols-2 gap-2">

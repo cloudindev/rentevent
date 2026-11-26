@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aggregateMaterial, clampCount, compareLocation, containerScanPlan, deliveryNoteNumber, expandContainer, groupByLocation, inspectionDue, labelUrl, lineStatus, listStatus, matchScan, normalizeCode, progress, settleReturn, wouldCycle } from "./logic";
+import { aggregateMaterial, clampCount, compareLocation, containerScanPlan, deliveryNoteNumber, expandContainer, groupByLocation, inspectionDue, labelUrl, lineStatus, listStatus, matchScan, nextSerials, normalizeCode, outstandingReturn, progress, settleReturn, unitStatusEffects, wouldCycle } from "./logic";
 
 const L = (q: number, p = 0, lo = 0, r = 0, d = 0, x = 0) => ({ quantity: q, prepared: p, loaded: lo, returned: r, damaged: d, lost: x });
 
@@ -141,5 +141,42 @@ describe("serial tracking", () => {
     );
     const back = containerScanPlan([line("lm", "mic", 2, { damaged: 1 })], "retorno", { units: [{ itemId: "mic", serial: "M1" }, { itemId: "mic", serial: "M2" }], bulk: [] });
     expect(back.updates[0]).toEqual({ lineId: "lm", count: 1, serials: ["M1"] });
+  });
+});
+
+describe("nextSerials", () => {
+  it("numbers from 1 and skips serials and QR codes in use", () => {
+    expect(nextSerials("SIL", 2, [])).toEqual([
+      { serial: "SIL-001", qrCode: "RV-SIL-001" },
+      { serial: "SIL-002", qrCode: "RV-SIL-002" },
+    ]);
+    // SIL-002 was renamed to "sil-004" but keeps its QR code RV-SIL-002; SIL-003 exists
+    expect(nextSerials("SIL", 3, ["SIL-001", "RV-SIL-001", "sil-004", "RV-SIL-002", "SIL-003", "RV-SIL-003"]).map((x) => x.serial)).toEqual(["SIL-005", "SIL-006", "SIL-007"]);
+  });
+});
+
+describe("outstandingReturn", () => {
+  it("keeps only what is still expected back, per item", () => {
+    const l = (itemId: string, quantity: number, returned: number, damaged = 0, lost = 0) => ({ itemId, quantity, returned, damaged, lost });
+    expect(outstandingReturn([l("a", 10, 7, 1), l("b", 4, 4), l("c", 3, 0, 0, 3), l("d", 2.5, 1)])).toEqual([
+      { itemId: "a", quantity: 2 },
+      { itemId: "d", quantity: 1.5 },
+    ]);
+  });
+});
+
+describe("unitStatusEffects", () => {
+  it("workshop states open and release a repair", () => {
+    expect(unitStatusEffects("disponible", "reparacion")).toEqual({ releaseRepair: false, openRepair: "reparacion", stockTotalDelta: 0 });
+    expect(unitStatusEffects("limpieza", "disponible")).toEqual({ releaseRepair: true, openRepair: null, stockTotalDelta: 0 });
+    expect(unitStatusEffects("reparacion", "limpieza")).toEqual({ releaseRepair: true, openRepair: "limpieza", stockTotalDelta: 0 });
+  });
+  it("written off or lost leaves stock; recovering it comes back", () => {
+    expect(unitStatusEffects("disponible", "baja").stockTotalDelta).toBe(-1);
+    expect(unitStatusEffects("reparacion", "perdida")).toEqual({ releaseRepair: true, openRepair: null, stockTotalDelta: -1 });
+    expect(unitStatusEffects("perdida", "disponible").stockTotalDelta).toBe(1);
+    expect(unitStatusEffects("baja", "reparacion")).toEqual({ releaseRepair: false, openRepair: "reparacion", stockTotalDelta: 1 });
+    expect(unitStatusEffects("baja", "perdida").stockTotalDelta).toBe(0);
+    expect(unitStatusEffects("disponible", "disponible")).toEqual({ releaseRepair: false, openRepair: null, stockTotalDelta: 0 });
   });
 });

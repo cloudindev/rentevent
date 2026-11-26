@@ -1,32 +1,59 @@
 import "server-only";
-import { and, asc, contacts, eq, inArray, isNotNull, isNull, itemUnits, items, or, movements, orderLines, orders, pickListLines, pickLists, projects, repairs, sql, type Tx } from "@rentevent/db";
+import { and, asc, contacts, desc, eq, inArray, isNotNull, isNull, itemUnits, items, or, movements, orderLines, orders, pickListLines, pickLists, projects, repairs, sql, type Tx } from "@rentevent/db";
 import { syncReservations } from "@rentevent/db/services";
 import { UserError } from "../action";
 import { audit } from "../audit";
 import type { AppContext } from "../context";
-import { aggregateMaterial, compareLocation, lineStatus, listStatus, type PickKind } from "./logic";
+import { aggregateMaterial, compareLocation, lineStatus, listStatus, outstandingReturn, type PickKind } from "./logic";
 import { detachStrays, logUnitEvents } from "./tracking";
 
 type Ctx = Pick<AppContext, "user">;
 
-/** Creates (or returns the existing) pick list of an order. Idempotent per order + kind. */
+const numericLines = (ls: (typeof pickListLines.$inferSelect)[]) => ls.map((l) => ({ itemId: l.itemId, quantity: Number(l.quantity), returned: Number(l.returned), damaged: Number(l.damaged), lost: Number(l.lost) }));
+
+/** The list to work on for an order: the open one, else the latest (closed) one. */
+export async function currentPickList(tx: Tx, orderId: string, kind: PickKind): Promise<{ id: string; status: string } | null> {
+  const lists = await tx.select({ id: pickLists.id, status: pickLists.status }).from(pickLists).where(and(eq(pickLists.orderId, orderId), eq(pickLists.kind, kind))).orderBy(desc(pickLists.createdAt));
+  return (kind === "retorno" ? lists.find((l) => l.status !== "devuelto") : undefined) ?? lists[0] ?? null;
+}
+
+/**
+ * The existing list createPickList should return, or null to create one. A closed
+ * return whose order is still on site with material missing gets a follow-up list
+ * for what is still out, so the rest can be received later.
+ */
+async function reusableList(tx: Tx, orderId: string, kind: PickKind): Promise<string | null> {
+  const cur = await currentPickList(tx, orderId, kind);
+  if (!cur || kind === "salida" || cur.status !== "devuelto") return cur?.id ?? null;
+  const [order] = await tx.select({ status: orders.status }).from(orders).where(eq(orders.id, orderId));
+  if (order?.status !== "en_curso") return cur.id;
+  const left = outstandingReturn(numericLines(await tx.select().from(pickListLines).where(eq(pickListLines.pickListId, cur.id))));
+  return left.length ? null : cur.id;
+}
+
+/**
+ * Creates (or returns the existing) pick list of an order: one per order + kind,
+ * plus follow-up return lists for material still missing after a partial return.
+ */
 export async function createPickList(tx: Tx, ctx: Ctx | null, orderId: string, kind: PickKind): Promise<string> {
-  const [existing] = await tx.select({ id: pickLists.id }).from(pickLists).where(and(eq(pickLists.orderId, orderId), eq(pickLists.kind, kind)));
-  if (existing) return existing.id;
+  const existing = await reusableList(tx, orderId, kind);
+  if (existing) return existing;
   const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).for("update");
   if (!order) throw new UserError("Pedido no encontrado");
   // a concurrent request may have created it while we waited for the lock
-  const [again] = await tx.select({ id: pickLists.id }).from(pickLists).where(and(eq(pickLists.orderId, orderId), eq(pickLists.kind, kind)));
-  if (again) return again.id;
-  const rows = await tx.select({ itemId: orderLines.itemId, quantity: orderLines.quantity, kind: orderLines.kind }).from(orderLines).where(eq(orderLines.orderId, orderId));
-  const material = aggregateMaterial(rows);
-  if (material.length === 0) throw new UserError("El pedido no tiene material para preparar.");
+  const again = await reusableList(tx, orderId, kind);
+  if (again) return again;
+  // follow-up of a partial return: only what the previous return left out
+  const previous = kind === "retorno" ? await currentPickList(tx, orderId, "retorno") : null;
+  const rows = previous ? [] : await tx.select({ itemId: orderLines.itemId, quantity: orderLines.quantity, kind: orderLines.kind }).from(orderLines).where(eq(orderLines.orderId, orderId));
+  const material = previous ? outstandingReturn(numericLines(await tx.select().from(pickListLines).where(eq(pickListLines.pickListId, previous.id)))) : aggregateMaterial(rows);
+  if (material.length === 0) throw new UserError(previous ? "No queda material pendiente de volver." : "El pedido no tiene material para preparar.");
   const its = await tx.select({ id: items.id, location: items.location }).from(items).where(inArray(items.id, material.map((m) => m.itemId)));
   const loc = new Map(its.map((i) => [i.id, i.location]));
   const sorted = [...material].sort((a, b) => compareLocation(loc.get(a.itemId), loc.get(b.itemId)));
   // a return list starts from what actually left (loaded quantities), when known
   let qty = new Map(sorted.map((m) => [m.itemId, m.quantity]));
-  if (kind === "retorno") {
+  if (kind === "retorno" && !previous) {
     const [out] = await tx.select().from(pickLists).where(and(eq(pickLists.orderId, orderId), eq(pickLists.kind, "salida")));
     if (out) {
       const outLines = await tx.select().from(pickListLines).where(eq(pickListLines.pickListId, out.id));
@@ -43,7 +70,7 @@ export async function createPickList(tx: Tx, ctx: Ctx | null, orderId: string, k
     .filter((m) => (qty.get(m.itemId) ?? 0) > 0)
     .map((m) => ({ pickListId: list!.id, itemId: m.itemId, location: loc.get(m.itemId) ?? null, quantity: qty.get(m.itemId)!, status: kind === "salida" ? "por_preparar" : "por_volver" }));
   if (values.length) await tx.insert(pickListLines).values(values);
-  await audit(tx, ctx, "pick_list", list!.id, "crear", { pedido: order.number, tipo: kind });
+  await audit(tx, ctx, "pick_list", list!.id, "crear", { pedido: order.number, tipo: kind, ...(previous ? { pendienteDe: previous.id } : {}) });
   return list!.id;
 }
 
@@ -156,16 +183,19 @@ export async function closeReturn(tx: Tx, ctx: Ctx, listId: string, input: Retur
   const outLines = outList ? await tx.select({ itemId: pickListLines.itemId, scannedUnits: pickListLines.scannedUnits }).from(pickListLines).where(eq(pickListLines.pickListId, outList.id)) : [];
   const outSerials = new Map(outLines.map((l) => [l.itemId, l.scannedUnits]));
   const settled: string[] = [];
+  let pending = false;
   for (const l of data.lines) {
     const i = input.find((x) => x.lineId === l.id) ?? { lineId: l.id, returned: l.returned, damaged: l.damaged, lost: l.lost, dirty: false };
     const returned = Math.max(0, Math.min(i.returned, l.quantity));
     const damaged = Math.max(0, Math.min(i.damaged, l.quantity - returned));
     let lost = Math.max(0, Math.min(i.lost, l.quantity - returned - damaged));
-    const missing = l.quantity - returned - damaged - lost;
+    const missing = Math.round((l.quantity - returned - damaged - lost) * 100) / 100;
     if (missingAsLost) lost += missing;
+    else if (missing > 0) pending = true;
     await tx.update(pickListLines).set({ returned, damaged, lost, status: "devuelto" }).where(eq(pickListLines.id, l.id));
     if (returned > 0) await tx.insert(movements).values({ itemId: l.itemId, orderId: data.list.orderId, kind: "retorno", quantity: returned, userId: ctx.user.id, note: `Retorno pedido ${orderNo}` });
-    const units = await settleUnits(tx, ctx, data.list.orderId, orderNo, l, { returned, damaged, lost }, outSerials.get(l.itemId) ?? []);
+    const dirty = i.dirty && returned > 0;
+    const units = await settleUnits(tx, ctx, data.list.orderId, orderNo, l, { returned, damaged, lost }, outSerials.get(l.itemId) ?? [], dirty);
     settled.push(...units.all);
     if (damaged > 0) {
       await tx.insert(movements).values({ itemId: l.itemId, orderId: data.list.orderId, kind: "dano", quantity: damaged, userId: ctx.user.id, note: i.note ?? `Dañado en pedido ${orderNo}` });
@@ -177,8 +207,12 @@ export async function closeReturn(tx: Tx, ctx: Ctx, listId: string, input: Retur
       await tx.update(items).set({ stockRepair: sql`${items.stockRepair} + ${damaged}` }).where(eq(items.id, l.itemId));
       repairsCreated++;
     }
-    if (i.dirty && returned > 0) {
-      await tx.insert(repairs).values({ itemId: l.itemId, orderId: data.list.orderId, kind: "limpieza", quantity: returned, status: "pendiente", reason: `Lona sucia tras el pedido ${orderNo}` });
+    if (dirty) {
+      // as with damage: one cleaning per serial unit (finishing it frees that unit), the rest as one bulk job
+      const reason = `Lona sucia tras el pedido ${orderNo}`;
+      const perUnit = units.cleaning.map((unitId) => ({ itemId: l.itemId, unitId, orderId: data.list.orderId, kind: "limpieza", quantity: 1, status: "pendiente", reason }));
+      const bulk = returned - perUnit.length;
+      await tx.insert(repairs).values([...perUnit, ...(bulk > 0 ? [{ itemId: l.itemId, orderId: data.list.orderId, kind: "limpieza", quantity: bulk, status: "pendiente", reason }] : [])]);
       await tx.update(items).set({ stockRepair: sql`${items.stockRepair} + ${returned}` }).where(eq(items.id, l.itemId));
       await tx.insert(movements).values({ itemId: l.itemId, orderId: data.list.orderId, kind: "reparacion_alta", quantity: returned, userId: ctx.user.id, note: "A limpieza" });
       repairsCreated++;
@@ -203,11 +237,6 @@ export async function closeReturn(tx: Tx, ctx: Ctx, listId: string, input: Retur
   // a unit that came back without its case (or the other way round) is taken out of it
   const stillOut = await tx.select({ id: itemUnits.id }).from(itemUnits).where(and(eq(itemUnits.currentOrderId, data.list.orderId), isNotNull(itemUnits.parentUnitId)));
   await detachStrays(tx, ctx, [...settled, ...backContainers, ...stillOut.map((u) => u.id)]);
-  const pending = data.lines.some((l) => {
-    const i = input.find((x) => x.lineId === l.id);
-    const acc = (i?.returned ?? 0) + (i?.damaged ?? 0) + (i?.lost ?? 0);
-    return !missingAsLost && acc < l.quantity;
-  });
   await tx.update(pickLists).set({ status: "devuelto" }).where(eq(pickLists.id, listId));
   if (data.order && !pending) {
     await tx.update(orders).set({ status: "devuelto" }).where(eq(orders.id, data.order.id));
@@ -230,6 +259,7 @@ async function settleUnits(
   line: { itemId: string; scannedUnits: string[] },
   counts: { returned: number; damaged: number; lost: number },
   outSerials: string[],
+  dirty = false,
 ) {
   const mine = await tx
     .select({ id: itemUnits.id, serial: itemUnits.serial })
@@ -242,16 +272,21 @@ async function settleUnits(
       ),
     )
     .orderBy(asc(itemUnits.serial));
-  if (!mine.length) return { all: [] as string[], damaged: [] as string[] };
+  if (!mine.length) return { all: [] as string[], damaged: [] as string[], cleaning: [] as string[] };
   const back = line.scannedUnits.length ? mine.filter((u) => line.scannedUnits.includes(u.serial)) : mine.slice(0, counts.returned);
   const rest = mine.filter((u) => !back.includes(u));
   const lostU = rest.slice(0, counts.lost);
   const damagedU = rest.slice(counts.lost, counts.lost + counts.damaged);
+  // dirty fabrics come back but go to the cleaning queue, not to the shelf
+  const cleanU = dirty ? back.slice(0, counts.returned) : [];
+  const freeU = back.filter((u) => !cleanU.includes(u));
   const now = new Date();
   const ids = (xs: { id: string }[]) => xs.map((x) => x.id);
-  if (back.length) {
-    await tx.update(itemUnits).set({ status: "disponible", currentOrderId: null, lastSeenAt: now }).where(inArray(itemUnits.id, ids(back)));
-    await logUnitEvents(tx, ctx, ids(back), "retorno", { orderId, note: `Retorno pedido ${orderNo}` });
+  if (back.length) await logUnitEvents(tx, ctx, ids(back), "retorno", { orderId, note: `Retorno pedido ${orderNo}` });
+  if (freeU.length) await tx.update(itemUnits).set({ status: "disponible", currentOrderId: null, lastSeenAt: now }).where(inArray(itemUnits.id, ids(freeU)));
+  if (cleanU.length) {
+    await tx.update(itemUnits).set({ status: "limpieza", currentOrderId: null, lastSeenAt: now }).where(inArray(itemUnits.id, ids(cleanU)));
+    await logUnitEvents(tx, ctx, ids(cleanU), "limpieza", { orderId, note: `Sucia tras el pedido ${orderNo}` });
   }
   if (damagedU.length) {
     await tx.update(itemUnits).set({ status: "reparacion", currentOrderId: null, lastSeenAt: now }).where(inArray(itemUnits.id, ids(damagedU)));
@@ -262,5 +297,5 @@ async function settleUnits(
     await tx.update(itemUnits).set({ status: "perdida" }).where(inArray(itemUnits.id, ids(lostU)));
     await logUnitEvents(tx, ctx, ids(lostU), "perdido", { orderId, note: `No volvió del pedido ${orderNo}` });
   }
-  return { all: mine.map((u) => u.id), damaged: ids(damagedU) };
+  return { all: mine.map((u) => u.id), damaged: ids(damagedU), cleaning: ids(cleanU) };
 }

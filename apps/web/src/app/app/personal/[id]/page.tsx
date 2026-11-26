@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { HardHat } from "lucide-react";
-import { and, asc, assignments, desc, eq, gte, lt, member, projects, shifts, timeEntries, user, workerUnavailability, workers } from "@rentevent/db";
+import { and, asc, assignments, desc, eq, gte, lt, member, ne, projects, shifts, timeEntries, user, workerUnavailability, workers } from "@rentevent/db";
 import { PHASE_LABELS, type PhaseKind } from "@rentevent/core";
 import { PageBody, PageHeader } from "@/components/app/page-header";
 import { PersonalTabs } from "@/components/crew/personal-tabs";
@@ -12,17 +12,19 @@ import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { can, canSeeField } from "@/lib/permissions";
 import { formatDate, formatDateTime, formatEUR, formatTime } from "@/lib/utils";
 import { tenantDb } from "@/server/context";
-import { aggregateDays, nowMs, workedHours } from "@/server/crew/hours";
+import { aggregateDays, madridDay, nowMs, workedHours } from "@/server/crew/hours";
+import { monthBounds } from "@/server/crew/register";
 import { AbsencesCard, LinkUserCard } from "./client";
 
 export default async function WorkerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  // same month (Madrid) and rules as Fichajes
+  const { from: monthStart, to: monthEnd } = monthBounds(madridDay(new Date(nowMs())).slice(0, 7));
   const data = await tenantDb(async (tx, ctx) => {
     const [w] = await tx.select().from(workers).where(eq(workers.id, id));
     if (!w) return null;
-    const [unav, asg, entries, members] = await Promise.all([
+    const [unav, asg, entries, members, monthAsg] = await Promise.all([
       tx.select().from(workerUnavailability).where(eq(workerUnavailability.workerId, id)).orderBy(desc(workerUnavailability.startsAt)),
       tx
         .select({ a: assignments, s: shifts, project: projects.name })
@@ -32,19 +34,23 @@ export default async function WorkerPage({ params }: { params: Promise<{ id: str
         .where(and(eq(assignments.workerId, id), gte(shifts.startsAt, new Date(nowMs() - 60 * 86_400_000))))
         .orderBy(desc(shifts.startsAt))
         .limit(60),
-      tx.select().from(timeEntries).where(and(eq(timeEntries.workerId, id), gte(timeEntries.clockIn, monthStart))).orderBy(asc(timeEntries.clockIn)),
+      tx.select().from(timeEntries).where(and(eq(timeEntries.workerId, id), gte(timeEntries.clockIn, monthStart), lt(timeEntries.clockIn, monthEnd))).orderBy(asc(timeEntries.clockIn)),
       tx.select({ id: user.id, name: user.name, email: user.email }).from(member).innerJoin(user, eq(user.id, member.userId)),
+      tx
+        .select({ start: shifts.startsAt, end: shifts.endsAt })
+        .from(assignments)
+        .innerJoin(shifts, eq(shifts.id, assignments.shiftId))
+        .where(and(eq(assignments.workerId, id), ne(assignments.status, "rechazado"), gte(shifts.startsAt, monthStart), lt(shifts.startsAt, monthEnd))),
     ]);
-    return { w, unav, asg, entries, members, ctx };
+    return { w, unav, asg, entries, members, monthAsg, ctx };
   });
   if (!data) notFound();
   const { w, ctx } = data;
   const showCost = canSeeField(ctx.role, "coste_hora", ctx.fieldPermissions);
   const canEdit = can(ctx.role, "personal");
-  const monthShifts = data.asg.filter((x) => x.s.startsAt >= monthStart && x.a.status !== "rechazado");
   const days = aggregateDays(
     data.entries.map((e) => ({ workerId: e.workerId, clockIn: e.clockIn, clockOut: e.clockOut, breakMinutes: e.breakMinutes, diet: e.diet })),
-    monthShifts.filter((x) => x.s.endsAt < new Date()).map((x) => ({ workerId: id, start: x.s.startsAt, end: x.s.endsAt })),
+    data.monthAsg.map((x) => ({ workerId: id, start: x.start, end: x.end })),
   );
   const real = days.reduce((s, d) => s + d.real, 0);
   const planned = days.reduce((s, d) => s + d.planned, 0);

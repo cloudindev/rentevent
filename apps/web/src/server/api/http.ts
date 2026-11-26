@@ -1,6 +1,7 @@
 import "server-only";
 import { and, apiKeys, eq, isNull, systemDb, withTenant, type Tx } from "@rentevent/db";
 import { hashApiKey, looksLikeApiKey, takeToken } from "./keys";
+import { loadPlanAccess } from "../billing/tenant-access";
 
 export type ApiContext = { tenantId: string; keyId: string; keyName: string };
 
@@ -36,7 +37,10 @@ export async function withApiKey<T>(req: Request, fn: (tx: Tx, api: ApiContext) 
     const rl = takeToken(key.id, 120, 2);
     if (!rl.ok) throw new ApiError(429, "rate_limited", "Demasiadas peticiones", { retryAfter: rl.retryAfter });
     void systemDb().update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.id, key.id)).catch(() => {});
-    const data = await withTenant(key.tenantId, (tx) => fn(tx, { tenantId: key.tenantId, keyId: key.id, keyName: key.name }));
+    const data = await withTenant(key.tenantId, async (tx) => {
+      if (!(await loadPlanAccess(tx)).api) throw new ApiError(403, "plan_required", "La API está incluida en el plan Empresa de Rentevent");
+      return fn(tx, { tenantId: key.tenantId, keyId: key.id, keyName: key.name });
+    });
     if (data instanceof Response) return data;
     return json(data, 200, { "X-RateLimit-Remaining": String(rl.remaining) });
   } catch (e) {

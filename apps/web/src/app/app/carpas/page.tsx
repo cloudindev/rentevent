@@ -23,6 +23,8 @@ export default async function CarpasPage() {
   });
   const itemById = new Map(cat.items.map((i) => [i.id, i]));
   const families = cat.families.filter((f) => f.active);
+  // inactive families stay listed (at the end) so they can be opened and reactivated
+  const listed = [...families, ...cat.families.filter((f) => !f.active)];
   const pending = families.filter((f) => f.parametersPending).length;
   return (
     <>
@@ -42,7 +44,7 @@ export default async function CarpasPage() {
             </Button>
           </div>
         )}
-        {families.length === 0 ? (
+        {listed.length === 0 ? (
           <EmptyState icon={Tent} title="Aún no hay familias de carpa" description="Crea tu primera familia (ancho, altura, módulo y cercha) o carga la plantilla de ejemplo desde el asistente de alta." action={can(ctx.role, "carpas") ? <NewFamilyButton /> : undefined} />
         ) : (
           <Table>
@@ -60,12 +62,12 @@ export default async function CarpasPage() {
               </TR>
             </THead>
             <TBody>
-              {families.map((f) => {
+              {listed.map((f) => {
                 const truss = f.trussItemId ? itemById.get(f.trussItemId) : null;
                 const rules = cat.rules.filter((r) => r.familyId === f.id).length;
                 const shared = truss ? families.filter((x) => x.trussItemId === truss.id).length > 1 : false;
                 return (
-                  <TR key={f.id}>
+                  <TR key={f.id} className={f.active ? undefined : "text-muted-foreground"}>
                     <TD>
                       <Link href={`/app/carpas/${f.id}`} className="font-medium hover:underline">
                         {f.name}
@@ -81,10 +83,10 @@ export default async function CarpasPage() {
                       {shared && <span className="ml-1.5 text-xs text-muted-foreground">(compartida)</span>}
                     </TD>
                     <TD className="tabular text-right">{truss ? truss.stockTotal - truss.stockRepair : "—"}</TD>
-                    <TD className="tabular text-right">{f.roofShape === "jaima" ? "5x5" : `${f.maxModules * f.moduleLength} m`}</TD>
+                    <TD className="tabular text-right">{f.roofShape === "jaima" ? `${f.width}x${f.width} m` : `${f.maxModules * f.moduleLength} m`}</TD>
                     <TD className="tabular text-right">{rules}</TD>
                     <TD className="tabular text-right">{f.price ? `${formatEUR(f.price)}/${f.priceMode === "m2" ? "m²" : "ml"}` : "—"}</TD>
-                    <TD>{f.parametersPending ? <StatusPill tone="warning">Pendiente validar</StatusPill> : <StatusPill tone="success">Validada</StatusPill>}</TD>
+                    <TD>{!f.active ? <StatusPill tone="neutral">Inactiva</StatusPill> : f.parametersPending ? <StatusPill tone="warning">Pendiente validar</StatusPill> : <StatusPill tone="success">Validada</StatusPill>}</TD>
                   </TR>
                 );
               })}

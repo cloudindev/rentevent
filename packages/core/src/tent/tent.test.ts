@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fixtureFamilies, fixtureGutter, fixtureItems, fixtureRules, fixtureVehicles } from "../fixtures/asturias";
 import { computeBom, mergeBomLines, vehiclesFor } from "./bom";
-import { computeCompositionBom } from "./composition";
+import { computeCompositionBom, gutterFromItems } from "./composition";
 import { computeSeating } from "./seating";
 import {
   compositionSchema,
@@ -239,6 +239,15 @@ describe("seating", () => {
 });
 
 describe("compositions", () => {
+  it("derives the gutter unit length from the canalón item", () => {
+    expect(gutterFromItems(fixtureItems)).toEqual(fixtureGutter);
+    expect(gutterFromItems([{ id: "g", role: "canalon", roleAmount: 6 }])).toEqual({ itemId: "g", unitLength: 6 });
+    // roleAmount left at its default (1) means the standard 5 m piece
+    expect(gutterFromItems([{ id: "g", role: "canalon", roleAmount: 1 }])).toEqual({ itemId: "g", unitLength: 5 });
+    expect(gutterFromItems([{ id: "g", role: "canalon" }])).toEqual({ itemId: "g", unitLength: 5 });
+    expect(gutterFromItems([{ id: "x", role: "otro" }])).toBeNull();
+  });
+
   it("sums tents, gutters and detects collisions", () => {
     const a = defaultConfiguration(fam("fam-10b"), 4);
     const b = defaultConfiguration(fam("fam-10b"), 4);

@@ -48,7 +48,7 @@ export const area: HelpArea = {
       ],
       notes: [
         "Con **Cada día** o **Cada semana**, las acciones de correo y notificación se aplican a cada pedido abierto (en consulta, opción, confirmado o en curso) que no haya terminado y cumpla las condiciones.",
-        "La acción **Publicar el planning de la semana** publica los turnos de la semana siguiente, de lunes a domingo, y avisa a los trabajadores asignados.",
+        "La acción **Publicar el planning de la semana** publica los turnos de la semana siguiente, de lunes a domingo, y avisa a los trabajadores asignados. Por correo usa el email de su ficha y por WhatsApp su teléfono; quien no lo tenga se salta.",
       ],
     },
     {
@@ -94,6 +94,7 @@ export const area: HelpArea = {
       ],
       notes: [
         "Cada fila indica la última ejecución o **Nunca ejecutado**.",
+        "Cuando un evento (por ejemplo, un pedido confirmado) dispara un workflow cuyas condiciones no se cumplen, queda en el registro como **omitido** con el detalle «No cumple las condiciones».",
         "Los usuarios sin permiso de workflows ven la lista y el registro, pero no pueden cambiar nada.",
       ],
     },

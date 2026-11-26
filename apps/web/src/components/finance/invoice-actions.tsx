@@ -30,6 +30,8 @@ export function InvoiceActions({
   const { pending, run } = useAction();
   const [dialog, setDialog] = useState<null | "issue" | "pay" | "rect" | "mail" | "delete">(null);
   const outstanding = Math.round((invoice.total - invoice.paid) * 100) / 100;
+  // a fully paid invoice has no "Registrar cobro" button: its payments are corrected with a negative one from the menu
+  const correctable = outstanding <= 0.005 && Math.abs(invoice.paid) > 0.005 && invoice.status !== "anulada";
   const [pay, setPay] = useState({ amount: outstanding, paidOn: today(), method: "transferencia" as const, bankAccountId: accounts[0]?.id ?? "", reference: "", createMovement: true });
   const [reason, setReason] = useState("");
   const [mail, setMail] = useState({ to: invoice.clientEmail ?? "", message: "" });
@@ -60,7 +62,13 @@ export function InvoiceActions({
             </a>
           </Button>
           {outstanding > 0.005 && invoice.status !== "anulada" && (
-            <Button size="sm" onClick={() => setDialog("pay")}>
+            <Button
+              size="sm"
+              onClick={() => {
+                setPay((p) => ({ ...p, amount: outstanding }));
+                setDialog("pay");
+              }}
+            >
               <Wallet /> Registrar cobro
             </Button>
           )}
@@ -80,6 +88,19 @@ export function InvoiceActions({
               <DropdownMenuItem onSelect={() => window.open(`/app/ventas/${invoice.id}/xml`, "_self")}>
                 <FileCode2 /> Descargar XML (factura electrónica)
               </DropdownMenuItem>
+              {correctable && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setPay((p) => ({ ...p, amount: -Math.round(invoice.paid * 100) / 100, createMovement: true }));
+                      setDialog("pay");
+                    }}
+                  >
+                    <Wallet /> Corregir cobro
+                  </DropdownMenuItem>
+                </>
+              )}
               {invoice.kind !== "rectificativa" && !invoice.rectified && (
                 <>
                   <DropdownMenuSeparator />
@@ -130,8 +151,10 @@ export function InvoiceActions({
       <Dialog open={dialog === "pay"} onOpenChange={(o) => !o && close()}>
         <DialogContent size="sm">
           <DialogHeader>
-            <DialogTitle>Registrar cobro</DialogTitle>
-            <DialogDescription>Pendiente: {formatEUR(outstanding)}</DialogDescription>
+            <DialogTitle>{correctable ? "Corregir cobro" : "Registrar cobro"}</DialogTitle>
+            <DialogDescription>
+              {correctable ? `Cobrado: ${formatEUR(invoice.paid)}. Un importe negativo resta lo cobrado (por ejemplo, un cobro apuntado por error o una devolución).` : `Pendiente: ${formatEUR(outstanding)}`}
+            </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Importe" htmlFor="p-amount">

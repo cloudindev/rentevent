@@ -10,6 +10,7 @@ import {
   invoices,
   items,
   lt,
+  ne,
   orderLines,
   orders,
   projects,
@@ -171,7 +172,8 @@ export async function crewHours(tx: Tx, r: Range) {
       .select({ workerId: assignments.workerId, start: shifts.startsAt, end: shifts.endsAt })
       .from(assignments)
       .innerJoin(shifts, eq(shifts.id, assignments.shiftId))
-      .where(and(gte(shifts.startsAt, a), lt(shifts.startsAt, b))),
+      // rejected assignments aren't planned work (same rule as Fichajes)
+      .where(and(gte(shifts.startsAt, a), lt(shifts.startsAt, b), ne(assignments.status, "rechazado"))),
     tx.select().from(timeEntries).where(and(gte(timeEntries.clockIn, a), lt(timeEntries.clockIn, b))),
   ]);
   return ws

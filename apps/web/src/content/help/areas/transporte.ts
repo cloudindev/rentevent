@@ -7,7 +7,7 @@ export const area: HelpArea = {
   overview: [
     "Transporte reúne tu flota y las rutas de cada día. En **Vehículos** registras camiones, furgonetas, tráileres, remolques y camiones grúa con su carga útil, su volumen, el carné que exigen y la fecha de la ITV.",
     "En **Rutas del día** aparecen los turnos de carga, transporte y retorno de los proyectos. Esos turnos se generan desde cada proyecto y la cuadrilla se asigna en el tablero de Personal; aquí eliges qué vehículo hace cada viaje.",
-    "Al asignar un vehículo, la app compara el peso y el volumen de las carpas del pedido con la capacidad del vehículo y comprueba si en la cuadrilla hay alguien con el carné necesario.",
+    "Al asignar un vehículo, la app compara el peso y el volumen del material del pedido (carpas, artículos sueltos y kits) con la capacidad del vehículo y comprueba si en la cuadrilla hay alguien con el carné necesario.",
   ],
   concepts: [
     { term: "Vehículo", definition: "Camión, furgoneta, tráiler, remolque o camión grúa de tu flota." },
@@ -59,8 +59,8 @@ export const area: HelpArea = {
       steps: [
         { title: "Busca el viaje", text: "En **Rutas del día** ve al día y localiza la tarjeta del turno." },
         { title: "Elige el vehículo", text: "En el desplegable de la tarjeta elige el vehículo (solo salen los activos) o **Sin vehículo** para quitarlo. Se guarda al momento." },
-        { title: "Comprueba la carga", text: "Si el pedido tiene carpas configuradas, verás el peso y el volumen de la carga frente a la capacidad del vehículo.", tip: "Si no cabe, el texto se pone en rojo y verás **Supera la capacidad** con cuántos viajes harían falta, o la opción de usar un vehículo mayor." },
-        { title: "Comprueba el conductor", text: "En transportes y retornos, la app busca en la cuadrilla a alguien con el carné del vehículo. Verás **Conductor** con su nombre o el aviso **Falta conductor con** el carné necesario.", tip: "Para vehículos de carné C también vale un conductor con C+E." },
+        { title: "Comprueba la carga", text: "Verás el peso y el volumen de la carga frente a la capacidad del vehículo. Se suman las carpas configuradas y el resto de artículos del pedido, según el peso y el volumen de cada ficha de inventario.", tip: "Si no cabe, el texto se pone en rojo y verás **Supera la capacidad** con cuántos viajes harían falta, o la opción de usar un vehículo mayor." },
+        { title: "Comprueba el conductor", text: "En transportes y retornos, la app busca en la cuadrilla a alguien con el carné del vehículo. Verás **Conductor** con su nombre o el aviso **Falta conductor con** el carné necesario.", tip: "Un carné superior también vale: para un vehículo de carné B sirve un conductor con C o C+E, y para uno de carné C, un conductor con C+E." },
       ],
       notes: ["El vehículo asignado también se ve en el tablero de Personal."],
     },

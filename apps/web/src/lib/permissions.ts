@@ -62,6 +62,11 @@ export function can(role: string, p: Permission): boolean {
   return ROLE_PERMISSIONS[role as Role]?.has(p) ?? false;
 }
 
+/** The team notice board (Comunicación → Avisos): anyone who plans or runs operations, not read-only users. */
+/** Everyone who works on projects (not Solo lectura or Montador): announcements, project tasks. */
+export const canCollaborate = (role: string) => can(role, "personal") || can(role, "comercial") || can(role, "almacen");
+export const canManageAnnouncements = canCollaborate;
+
 /** Field-level visibility; tenant overrides in settings.fieldPermissions[role][field]. */
 export const SENSITIVE_FIELDS = { margen: "ver_margen", coste: "ver_margen", coste_hora: "ver_costes" } as const;
 export function canSeeField(role: string, field: keyof typeof SENSITIVE_FIELDS, overrides?: Record<string, Record<string, boolean>>): boolean {

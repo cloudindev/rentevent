@@ -15,20 +15,33 @@ type Photo = PhotoRef & { preview: string };
 export function ClockForShift({ shiftId, openHere, openElsewhere }: { shiftId: string; openHere: boolean; openElsewhere: boolean }) {
   const router = useRouter();
   const [busy, start] = useTransition();
+  // same defaults as the Fichar tab
+  const [breakMinutes, setBreak] = useState(30);
+  const [diet, setDiet] = useState(false);
   const act = (kind: "clockIn" | "clockOut") =>
     start(async () => {
       const pos = await currentPosition();
       const at = new Date().toISOString();
-      const r = kind === "clockIn" ? await runOrQueue({ kind, payload: { shiftId, ...pos, at } }) : await runOrQueue({ kind, payload: { ...pos, at, breakMinutes: 0, diet: false } });
+      const r = kind === "clockIn" ? await runOrQueue({ kind, payload: { shiftId, ...pos, at } }) : await runOrQueue({ kind, payload: { ...pos, at, breakMinutes, diet } });
       if (r.status === "error") return void toast.error(r.error);
       toast.success(r.status === "queued" ? "Sin conexión: fichaje guardado, se enviará al recuperar cobertura" : kind === "clockIn" ? "Entrada registrada" : "Salida registrada");
       router.refresh();
     });
   if (openElsewhere && !openHere) return <p className="text-sm text-muted-foreground">Tienes una jornada abierta en otro turno. Ficha la salida desde Fichar.</p>;
   return openHere ? (
-    <Button className="w-full" size="lg" variant="dark" disabled={busy} onClick={() => act("clockOut")}>
-      <LogOut /> Fichar salida
-    </Button>
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 items-end gap-3">
+        <Field label="Pausa (min)" htmlFor="ts-break">
+          <Input id="ts-break" type="number" inputMode="numeric" min={0} value={breakMinutes} onChange={(e) => setBreak(Number(e.target.value))} />
+        </Field>
+        <label className="flex h-9 items-center gap-2 text-sm">
+          <Checkbox checked={diet} onCheckedChange={(v) => setDiet(v === true)} /> Dieta
+        </label>
+      </div>
+      <Button className="w-full" size="lg" variant="dark" disabled={busy} onClick={() => act("clockOut")}>
+        <LogOut /> Fichar salida
+      </Button>
+    </div>
   ) : (
     <Button className="w-full" size="lg" disabled={busy} onClick={() => act("clockIn")}>
       <LogIn /> Fichar entrada en este turno

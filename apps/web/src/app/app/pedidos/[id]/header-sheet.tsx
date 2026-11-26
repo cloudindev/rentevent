@@ -78,7 +78,7 @@ export function HeaderSheet({ open, onOpenChange, order, clients, venues }: { op
             {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </NativeSelect>
         </Field>
-        <Field label="Lugar" htmlFor="h-venue" className="col-span-2">
+        <Field label="Lugar del proyecto" htmlFor="h-venue" className="col-span-2" hint={`Se guarda en el proyecto ${order.projectName}: cambia para todos sus pedidos`}>
           <NativeSelect id="h-venue" value={v.venueId} onChange={(e) => setV({ ...v, venueId: e.target.value })}>
             <option value="">Sin lugar</option>
             {venues.map((x) => <option key={x.id} value={x.id}>{x.name}{x.anchoringAllowed ? "" : " · sin anclaje"}</option>)}
@@ -89,8 +89,8 @@ export function HeaderSheet({ open, onOpenChange, order, clients, venues }: { op
         <Field label="Inicio del evento" htmlFor="h-es"><Input id="h-es" type="datetime-local" value={v.eventStart} onChange={(e) => setV({ ...v, eventStart: e.target.value })} /></Field>
         <Field label="Fin del evento" htmlFor="h-ee"><Input id="h-ee" type="datetime-local" value={v.eventEnd} onChange={(e) => setV({ ...v, eventEnd: e.target.value })} /></Field>
         <Field label="Descuento cliente %" htmlFor="h-disc"><Input id="h-disc" type="number" min={0} max={100} value={v.discountPct} onChange={(e) => setV({ ...v, discountPct: Number(e.target.value) })} /></Field>
-        <Field label="Distancia (km)" htmlFor="h-km" hint="Calculada con la dirección; puedes corregirla"><Input id="h-km" type="number" min={0} value={v.distanceKm} onChange={(e) => setV({ ...v, distanceKm: e.target.value === "" ? "" : Number(e.target.value) })} /></Field>
-        <Field label="Viajes" htmlFor="h-trips"><Input id="h-trips" type="number" min={1} value={v.trips} onChange={(e) => setV({ ...v, trips: Number(e.target.value) })} /></Field>
+        <Field label="Distancia (km)" htmlFor="h-km" hint="Del proyecto (todos sus pedidos). Se calcula con la dirección; puedes corregirla"><Input id="h-km" type="number" min={0} value={v.distanceKm} onChange={(e) => setV({ ...v, distanceKm: e.target.value === "" ? "" : Number(e.target.value) })} /></Field>
+        <Field label="Viajes" htmlFor="h-trips" hint="Para la línea de transporte. Con 1 se calculan desde el despiece"><Input id="h-trips" type="number" min={1} value={v.trips} onChange={(e) => setV({ ...v, trips: Number(e.target.value) })} /></Field>
         <label className="flex items-center gap-2 self-end pb-2 text-sm"><Switch checked={v.holiday} onCheckedChange={(x) => setV({ ...v, holiday: x })} /> Festivo</label>
         <Field label="Notas" htmlFor="h-notes" className="col-span-2"><Textarea id="h-notes" value={v.notes} onChange={(e) => setV({ ...v, notes: e.target.value })} /></Field>
         {error && <p role="alert" className="col-span-2 text-sm text-danger">{error}</p>}

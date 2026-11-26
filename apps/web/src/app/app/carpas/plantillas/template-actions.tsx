@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { deleteTemplate } from "@/server/actions/tents";
 
@@ -20,7 +21,9 @@ export function TemplateActions({ id }: { id: string }) {
         onClick={() =>
           confirm("¿Eliminar la plantilla?") &&
           start(async () => {
-            await deleteTemplate({ id });
+            const r = await deleteTemplate({ id });
+            if (!r.ok) return void toast.error(r.error);
+            toast.success("Plantilla eliminada");
             router.refresh();
           })
         }

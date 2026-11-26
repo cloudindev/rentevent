@@ -13,18 +13,28 @@ const VAT = [21, 10, 4, 0];
 export function InvoiceEditor({
   invoiceId,
   clients,
+  series = [],
+  defaultSeriesCode,
+  generalVat = 21,
   initial,
 }: {
   invoiceId: string;
   clients: { id: string; name: string; taxId: string | null }[];
-  initial: { clientId: string | null; lines: InvoiceLine[]; notes: string | null; dueDate: string | null };
+  /** Series of this document's kind the user can pick; empty hides the selector. */
+  series?: { id: string; code: string; name: string; year: number }[];
+  defaultSeriesCode?: string;
+  generalVat?: number;
+  initial: { clientId: string | null; seriesId?: string | null; lines: InvoiceLine[]; notes: string | null; dueDate: string | null };
 }) {
   const [clientId, setClientId] = useState(initial.clientId ?? "");
-  const [lines, setLines] = useState<InvoiceLine[]>(initial.lines.length ? initial.lines : [{ description: "", quantity: 1, unitPrice: 0, discountPct: 0, taxRate: 21 }]);
+  const [seriesId, setSeriesId] = useState(initial.seriesId ?? "");
+  const [lines, setLines] = useState<InvoiceLine[]>(initial.lines.length ? initial.lines : [{ description: "", quantity: 1, unitPrice: 0, discountPct: 0, taxRate: generalVat }]);
   const [notes, setNotes] = useState(initial.notes ?? "");
   const [dueDate, setDueDate] = useState(initial.dueDate ?? "");
   const [dirty, setDirty] = useState(false);
   const { pending, run } = useAction();
+  // standard Spanish rates plus the tenant's general rate and any rate already on the lines
+  const vatRates = useMemo(() => [...new Set([generalVat, ...VAT, ...lines.map((l) => Number(l.taxRate))])].filter((v) => Number.isFinite(v)).sort((a, b) => b - a), [generalVat, lines]);
   const totals = useMemo(() => invoiceTotals(lines.map((l) => ({ ...l, quantity: Number(l.quantity) || 0, unitPrice: Number(l.unitPrice) || 0 }))), [lines]);
 
   const update = (i: number, patch: Partial<InvoiceLine>) => {
@@ -32,11 +42,11 @@ export function InvoiceEditor({
     setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   };
   const save = () =>
-    run(() => updateDraftInvoiceAction({ invoiceId, clientId: clientId || null, lines, notes, dueDate: dueDate || null }), { success: "Borrador guardado", onOk: () => setDirty(false) });
+    run(() => updateDraftInvoiceAction({ invoiceId, clientId: clientId || null, ...(series.length ? { seriesId: seriesId || null } : {}), lines, notes, dueDate: dueDate || null }), { success: "Borrador guardado", onOk: () => setDirty(false) });
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-[1fr_200px]">
+      <div className={series.length ? "grid gap-3 sm:grid-cols-[1fr_200px_200px]" : "grid gap-3 sm:grid-cols-[1fr_200px]"}>
         <Field label="Cliente" htmlFor="ie-client">
           <NativeSelect
             id="ie-client"
@@ -55,6 +65,25 @@ export function InvoiceEditor({
             ))}
           </NativeSelect>
         </Field>
+        {series.length > 0 && (
+          <Field label="Serie" htmlFor="ie-series" hint="Se numera al emitir">
+            <NativeSelect
+              id="ie-series"
+              value={seriesId}
+              onChange={(e) => {
+                setDirty(true);
+                setSeriesId(e.target.value);
+              }}
+            >
+              <option value="">{defaultSeriesCode ? `${defaultSeriesCode} (predeterminada)` : "Predeterminada"}</option>
+              {series.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.code} · {s.name}
+                </option>
+              ))}
+            </NativeSelect>
+          </Field>
+        )}
         <Field label="Vencimiento" htmlFor="ie-due" hint="Vacío: según condiciones del cliente">
           <Input
             id="ie-due"
@@ -98,7 +127,7 @@ export function InvoiceEditor({
                 </td>
                 <td className="px-1 py-1.5">
                   <NativeSelect aria-label="IVA" value={l.taxRate} onChange={(e) => update(i, { taxRate: Number(e.target.value) })}>
-                    {VAT.map((v) => (
+                    {vatRates.map((v) => (
                       <option key={v} value={v}>
                         {v} %
                       </option>
@@ -131,7 +160,7 @@ export function InvoiceEditor({
           size="sm"
           onClick={() => {
             setDirty(true);
-            setLines((ls) => [...ls, { description: "", quantity: 1, unitPrice: 0, discountPct: 0, taxRate: 21 }]);
+            setLines((ls) => [...ls, { description: "", quantity: 1, unitPrice: 0, discountPct: 0, taxRate: generalVat }]);
           }}
         >
           <Plus /> Añadir línea

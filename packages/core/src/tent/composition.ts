@@ -11,6 +11,21 @@ export type CompositionBom = {
   missingFamilies: string[];
 };
 
+/** Metres covered by one gutter unit when the item does not say otherwise. */
+export const DEFAULT_GUTTER_UNIT_LENGTH = 5;
+
+/**
+ * The gutter (canalón) item used to join tents: the first item with role "canalon".
+ * Its `roleAmount` is the length in metres of one unit; the default 1 (never set) means
+ * the standard 5 m piece.
+ */
+export function gutterFromItems(items: Pick<BomItem, "id" | "role" | "roleAmount">[]): { itemId: string; unitLength: number } | null {
+  const item = items.find((i) => i.role === "canalon");
+  if (!item) return null;
+  const amount = item.roleAmount ?? 1;
+  return { itemId: item.id, unitLength: amount > 1 ? amount : DEFAULT_GUTTER_UNIT_LENGTH };
+}
+
 export function computeCompositionBom(input: {
   composition: Composition;
   families: StructureFamily[];

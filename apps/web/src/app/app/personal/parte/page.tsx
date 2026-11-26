@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/ui/empty";
 import { formatDate, formatTime } from "@/lib/utils";
 import { tenantDb } from "@/server/context";
 import { madridMidnight, shiftKey } from "@/server/crew/board";
-import { madridDay } from "@/server/crew/hours";
+import { madridDay, mergeShiftReports } from "@/server/crew/hours";
 import { DatePicker, PrintButton } from "./client";
 
 export const metadata = { title: "Parte de trabajo" };
@@ -29,7 +29,7 @@ export default async function PartePage({ searchParams }: { searchParams: Promis
     const [asg, entries, reports, settings] = await Promise.all([
       ids.length ? tx.select({ a: assignments, name: workers.name }).from(assignments).innerJoin(workers, eq(workers.id, assignments.workerId)).where(inArray(assignments.shiftId, ids)) : [],
       ids.length ? tx.select().from(timeEntries).where(inArray(timeEntries.shiftId, ids)) : [],
-      ids.length ? tx.select().from(jobReports).where(inArray(jobReports.shiftId, ids)) : [],
+      ids.length ? tx.select({ r: jobReports, workerName: workers.name }).from(jobReports).leftJoin(workers, eq(workers.id, jobReports.workerId)).where(inArray(jobReports.shiftId, ids)) : [],
       tx.select().from(tenantSettings),
     ]);
     return { sh, asg, entries, reports, company: settings[0]?.legalName ?? "" };
@@ -54,8 +54,12 @@ export default async function PartePage({ searchParams }: { searchParams: Promis
         ) : (
           data.sh.map(({ s, project, vehicle, plate }) => {
             const crew = data.asg.filter((x) => x.a.shiftId === s.id && x.a.status !== "rechazado");
-            const report = data.reports.find((r) => r.shiftId === s.id);
-            const checklist = ((report?.checklist as { label: string; done: boolean }[] | undefined)?.length ? (report!.checklist as { label: string; done: boolean }[]) : (s.checklist as string[]).map((label) => ({ label, done: false })));
+            // each worker files their own report: show them merged, one parte per shift
+            const report = mergeShiftReports(
+              data.reports.filter((x) => x.r.shiftId === s.id).map(({ r, workerName }) => ({ ...r, workerName: workerName ?? "Trabajador", checklist: (r.checklist as { label: string; done: boolean }[]) ?? [] })),
+              s.checklist as string[],
+            );
+            const checklist = report.checklist;
             return (
               <article key={s.id} className="break-inside-avoid rounded-xl border p-5 print:rounded-none print:border-black/40">
                 <header className="flex flex-wrap items-baseline justify-between gap-2 border-b pb-3">
@@ -98,7 +102,14 @@ export default async function PartePage({ searchParams }: { searchParams: Promis
                         <span className="inline-block size-3.5 rounded-sm border border-current text-center text-[10px] leading-3">{c.done ? "✓" : ""}</span> {c.label}
                       </p>
                     ))}
-                    {report?.incidents && <p className="pt-2"><span className="text-xs text-muted-foreground">Incidencias:</span> {report.incidents}</p>}
+                    {report.incidents.length > 0 && (
+                      <div className="pt-2">
+                        <p className="text-xs text-muted-foreground">Incidencias:</p>
+                        {report.incidents.map((i) => (
+                          <p key={i.workerName + i.text} className="whitespace-pre-wrap">{report.incidents.length > 1 || crew.length > 1 ? <span className="font-medium">{i.workerName}: </span> : null}{i.text}</p>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <footer className="mt-4 grid grid-cols-2 gap-6 pt-2 text-xs text-muted-foreground">
@@ -107,8 +118,8 @@ export default async function PartePage({ searchParams }: { searchParams: Promis
                     <div className="mt-8 border-b border-dashed" />
                   </div>
                   <div>
-                    Cliente {report?.clientName ? `(${report.clientName})` : ""}
-                    {report?.clientSignature ? <img src={report.clientSignature} alt="Firma del cliente" className="mt-1 h-12" /> : <div className="mt-8 border-b border-dashed" />}
+                    Cliente {report.clientName ? `(${report.clientName})` : ""}
+                    {report.clientSignature ? <img src={report.clientSignature} alt="Firma del cliente" className="mt-1 h-12" /> : <div className="mt-8 border-b border-dashed" />}
                   </div>
                 </footer>
               </article>

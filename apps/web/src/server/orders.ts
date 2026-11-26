@@ -1,21 +1,32 @@
 import "server-only";
-import { asc, contacts, desc, eq, kitItems, kits, orderLines, orders, projects, quotes, tenantSettings, tentConfigurations, venues, type Tx } from "@rentevent/db";
+import { and, asc, contacts, desc, eq, kitItems, or, kits, orderLines, orders, projects, quotes, tenantSettings, tentConfigurations, venues, type Tx } from "@rentevent/db";
 import { loadAvailabilityInputs, marginMinutes } from "@rentevent/db/services";
-import { compositionSchema, DEFAULT_PRICING, haversineKm, roadKm, type PricingSettings } from "@rentevent/core";
+import { compositionSchema, DEFAULT_PRICING, gutterFromItems, haversineKm, roadKm, type PricingSettings } from "@rentevent/core";
 import type { Catalogue, WorkLine } from "@/lib/order-model";
 import { loadCatalog } from "./catalog";
 
+/** Project status and dates follow its most advanced order. */
+export async function syncProjectStatus(tx: Tx, projectId: string) {
+  const os = await tx.select({ status: orders.status, start: orders.periodStart, end: orders.periodEnd }).from(orders).where(eq(orders.projectId, projectId));
+  const rank = ["cancelado", "borrador", "consulta", "devuelto", "opcion", "confirmado", "en_curso"];
+  const top = os.map((o) => o.status).sort((a, b) => rank.indexOf(b) - rank.indexOf(a))[0] ?? "consulta";
+  const status = top === "borrador" ? "consulta" : top;
+  const start = os.length ? new Date(Math.min(...os.map((o) => o.start.getTime()))) : null;
+  const end = os.length ? new Date(Math.max(...os.map((o) => o.end.getTime()))) : null;
+  await tx.update(projects).set({ status, startsAt: start, endsAt: end }).where(eq(projects.id, projectId));
+}
+
 export async function loadCatalogue(tx: Tx): Promise<Catalogue> {
-  const cat = await loadCatalog(tx);
+  // inactive families stay loaded so orders that already use one keep rendering and saving
+  const cat = await loadCatalog(tx, { includeInactiveFamilies: true });
   const [ks, kis] = await Promise.all([tx.select().from(kits).orderBy(asc(kits.name)), tx.select().from(kitItems)]);
-  const gutterItem = cat.items.find((i) => i.role === "canalon");
   return {
     families: cat.families,
     rules: cat.rules,
     items: cat.items,
     vehicles: cat.vehicles,
     kits: ks.map((k) => ({ id: k.id, sku: k.sku, name: k.name, price: Number(k.price), items: kis.filter((x) => x.kitId === k.id).map((x) => ({ itemId: x.itemId, quantity: Number(x.quantity) })) })),
-    gutter: gutterItem ? { itemId: gutterItem.id, unitLength: gutterItem.weightKg > 0 ? 5 : 5 } : null,
+    gutter: gutterFromItems(cat.items),
   };
 }
 
@@ -73,7 +84,7 @@ export async function loadOrderWorkspace(tx: Tx, orderId: string) {
   if (distanceKm == null && pricing.base && (venue?.lat ?? project?.lat) != null) {
     distanceKm = roadKm(haversineKm(pricing.base, { lat: (venue?.lat ?? project?.lat)!, lng: (venue?.lng ?? project?.lng)! }));
   }
-  const clients = await tx.select({ id: contacts.id, name: contacts.name, discountPct: contacts.discountPct }).from(contacts).where(eq(contacts.kind, "cliente")).orderBy(asc(contacts.name));
+  const clients = await tx.select({ id: contacts.id, name: contacts.name, discountPct: contacts.discountPct }).from(contacts).where(and(eq(contacts.kind, "cliente"), order.clientId ? or(eq(contacts.archived, false), eq(contacts.id, order.clientId)) : eq(contacts.archived, false))).orderBy(asc(contacts.name));
   const venueList = await tx.select({ id: venues.id, name: venues.name, anchoringAllowed: venues.anchoringAllowed }).from(venues).orderBy(asc(venues.name));
   return {
     order: {
@@ -89,6 +100,8 @@ export async function loadOrderWorkspace(tx: Tx, orderId: string) {
       venueId: project?.venueId ?? null,
       venueName: venue?.name ?? project?.locationAddress ?? null,
       anchoringAllowed: venue?.anchoringAllowed ?? true,
+      // the venue plan, when it has a scale, can be placed under the tents in the configurator's plan view
+      sitePlan: venue?.planImageUrl && venue.metresPerPixel ? { imageUrl: venue.planImageUrl, metresPerPixel: venue.metresPerPixel } : null,
       periodStart: order.periodStart.toISOString(),
       periodEnd: order.periodEnd.toISOString(),
       eventStart: order.eventStart?.toISOString() ?? null,

@@ -9,6 +9,7 @@ import {
   hasBlockingConflict,
   PHASE_LABELS,
   SKILL_LABELS,
+  SKILLS,
   type Conflict,
   type ExistingAssignment,
   type PhaseKind,
@@ -26,6 +27,7 @@ import { cn, formatDate, formatTime } from "@/lib/utils";
 import { assignVehicle } from "@/server/actions/transport";
 import { assignWorker, deleteShift, publishPlanning, saveShift, suggestForShift, unassignWorker } from "@/server/actions/crew";
 import { blockPosition, dayBlockPosition, DAY_WINDOW, shiftKey, stackLanes, type BoardRange } from "@/server/crew/board";
+import { madridDay } from "@/server/crew/hours";
 import { ASSIGNMENT_LABEL, ASSIGNMENT_TONE, WorkerDot } from "./bits";
 
 export type BoardShift = {
@@ -164,7 +166,7 @@ export function Board({ data }: { data: BoardData }) {
           <Button size="icon-sm" variant="outline" aria-label="Anterior" onClick={() => nav({ fecha: shiftKey(data.anchor, -step) })}>
             <ChevronLeft />
           </Button>
-          <Button size="sm" variant="outline" onClick={() => nav({ fecha: new Date().toISOString().slice(0, 10) })}>
+          <Button size="sm" variant="outline" onClick={() => nav({ fecha: madridDay(new Date()) })}>
             Hoy
           </Button>
           <Button size="icon-sm" variant="outline" aria-label="Siguiente" onClick={() => nav({ fecha: shiftKey(data.anchor, step) })}>
@@ -810,6 +812,17 @@ function NewShiftDialog({ data, onClose }: { data: BoardData; onClose: () => voi
           <Field label="Lugar" htmlFor="ns-a">
             <Input id="ns-a" value={v.address} onChange={(e) => setV({ ...v, address: e.target.value })} />
           </Field>
+          <fieldset>
+            <legend className="mb-1.5 text-[13px] font-medium">Habilidades necesarias</legend>
+            <div className="grid grid-cols-2 gap-1.5">
+              {SKILLS.map((k) => (
+                <label key={k} className="flex items-center gap-2 text-sm">
+                  <Checkbox checked={v.skills.includes(k)} onCheckedChange={(c) => setV({ ...v, skills: c ? [...v.skills, k] : v.skills.filter((x) => x !== k) })} />
+                  {SKILL_LABELS[k]}
+                </label>
+              ))}
+            </div>
+          </fieldset>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>

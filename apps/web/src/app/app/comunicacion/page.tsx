@@ -7,7 +7,7 @@ import { QueryTabs } from "./query-tabs";
 import { StatusPill, type Tone } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { can } from "@/lib/permissions";
+import { can, canManageAnnouncements } from "@/lib/permissions";
 import { cn, formatDateTime, initials } from "@/lib/utils";
 import { tenantDb } from "@/server/context";
 import { AnnouncementActions, NewAnnouncement, NoticeComposer } from "./comms-client";
@@ -17,6 +17,7 @@ export const metadata = { title: "Comunicación" };
 const ENTITY_HREF: Record<string, (id: string) => string> = { order: (id) => `/app/pedidos/${id}`, project: (id) => `/app/proyectos/${id}`, contact: (id) => `/app/contactos/${id}`, item: (id) => `/app/inventario/${id}` };
 const ENTITY_LABEL: Record<string, string> = { order: "Pedido", project: "Proyecto", contact: "Contacto", item: "Artículo" };
 const STATUS_TONE: Record<string, Tone> = { enviada: "success", simulada: "neutral", error: "danger", sin_dispositivo: "warning" };
+const STATUS_LABEL: Record<string, string> = { enviada: "Enviada", simulada: "Simulada", error: "Error", sin_dispositivo: "Sin dispositivo" };
 const CHANNEL_LABEL: Record<string, string> = { push: "Push", email: "Correo", whatsapp: "WhatsApp", interno: "Interno" };
 
 export default async function CommsPage({ searchParams }: { searchParams: Promise<{ tab?: string; canal?: string; estado?: string }> }) {
@@ -32,6 +33,7 @@ export default async function CommsPage({ searchParams }: { searchParams: Promis
       notifs: tab === "registro" ? await tx.select().from(notifications).where(filters.length ? and(...filters) : undefined).orderBy(desc(notifications.createdAt)).limit(300) : [],
       team: tab === "enviar" ? await tx.select({ id: workers.id, name: workers.name, email: workers.email, phone: workers.phone, skills: workers.skills }).from(workers).where(eq(workers.active, true)).orderBy(asc(workers.name)) : [],
       canSend: can(ctx.role, "personal"),
+      canPost: canManageAnnouncements(ctx.role),
     };
   });
   const q = (params: Record<string, string | undefined>) => {
@@ -42,7 +44,7 @@ export default async function CommsPage({ searchParams }: { searchParams: Promis
   return (
     <>
       <PageHeader icon={MessageSquare} title="Comunicación">
-        {tab === "avisos" && <NewAnnouncement />}
+        {tab === "avisos" && d.canPost && <NewAnnouncement />}
       </PageHeader>
       <Suspense>
         <QueryTabs
@@ -71,7 +73,7 @@ export default async function CommsPage({ searchParams }: { searchParams: Promis
                       </h3>
                       <p className="text-xs text-muted-foreground">{a.authorName} · {formatDateTime(a.createdAt)}</p>
                     </div>
-                    <AnnouncementActions a={{ id: a.id, title: a.title, body: a.body, pinned: a.pinned }} />
+                    {d.canPost && <AnnouncementActions a={{ id: a.id, title: a.title, body: a.body, pinned: a.pinned }} />}
                   </div>
                   <p className="mt-2 whitespace-pre-wrap text-sm">{a.body}</p>
                 </li>
@@ -106,9 +108,9 @@ export default async function CommsPage({ searchParams }: { searchParams: Promis
                 </Link>
               ))}
               <span className="mx-1 w-px bg-border" />
-              {[undefined, "enviada", "simulada", "error"].map((s) => (
+              {[undefined, "enviada", "simulada", "error", "sin_dispositivo"].map((s) => (
                 <Link key={s ?? "all"} href={q({ estado: s })} className={cn("rounded-full border px-3 py-1 text-[13px]", (sp.estado ?? undefined) === s ? "bg-accent font-medium" : "text-muted-foreground hover:bg-accent")}>
-                  {s ?? "Todos los estados"}
+                  {s ? STATUS_LABEL[s] : "Todos los estados"}
                 </Link>
               ))}
             </nav>
@@ -136,7 +138,7 @@ export default async function CommsPage({ searchParams }: { searchParams: Promis
                         <p className="line-clamp-2 text-xs text-muted-foreground">{n.body}</p>
                         {n.entity && n.entityId && ENTITY_HREF[n.entity] && <Link className="text-xs text-link hover:underline" href={ENTITY_HREF[n.entity]!(n.entityId)}>{ENTITY_LABEL[n.entity]}</Link>}
                       </TD>
-                      <TD><StatusPill tone={STATUS_TONE[n.status] ?? "neutral"}>{n.status.replace("_", " ")}</StatusPill></TD>
+                      <TD><StatusPill tone={STATUS_TONE[n.status] ?? "neutral"}>{STATUS_LABEL[n.status] ?? n.status.replace("_", " ")}</StatusPill></TD>
                     </TR>
                   ))}
                 </TBody>

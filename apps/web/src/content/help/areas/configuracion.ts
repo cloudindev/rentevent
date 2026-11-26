@@ -75,6 +75,7 @@ export const area: HelpArea = {
         {
           title: "Elige el color de marca",
           text: "En la tarjeta **Funcionamiento**, usa el selector de **Color de marca** o escribe el código hexadecimal (por ejemplo #F95F40).",
+          tip: "El color se usa en los documentos y en la página de acceso de tu subdominio (iniciales, panel lateral y botón Iniciar sesión).",
         },
         {
           title: "Guarda",
@@ -126,15 +127,15 @@ export const area: HelpArea = {
         {
           title: "Invita a una persona",
           text: "En **Invitar a una persona** escribe el **Correo**, elige el **Rol** y pulsa **Invitar**.",
-          tip: "La persona recibe un correo con un enlace válido 7 días. Si ya pertenece a la empresa, se te avisará.",
+          tip: "La persona recibe un correo con un enlace válido 7 días. Si ya pertenece a la empresa, se te avisará. Con un plan de pago, cada invitación pendiente ocupa una plaza: si están todas ocupadas, amplía la suscripción o anula una invitación.",
         },
         {
           title: "Revisa las pendientes",
-          text: "Las invitaciones sin aceptar aparecen debajo como **Pendiente**, con su rol y la fecha de caducidad.",
+          text: "Las invitaciones sin aceptar aparecen debajo como **Pendiente**, con su rol y la fecha de caducidad. Pasados 7 días aparecen como **Caducada** y el enlace ya no sirve.",
         },
         {
           title: "Reenvía o anula",
-          text: "Pulsa **Reenviar** si la persona no encuentra el correo, o **Anular** para retirar la invitación.",
+          text: "Pulsa **Reenviar** si la persona no encuentra el correo o la invitación ha caducado (el enlace vuelve a valer 7 días), o **Anular** para retirar la invitación.",
         },
       ],
     },
@@ -300,7 +301,7 @@ export const area: HelpArea = {
         {
           title: "Elige qué importar",
           text: "Pulsa **Inventario** (se actualiza por SKU), **Clientes y proveedores** (por NIF o, si no hay, por nombre) o **Proyectos** (se crean como consulta con un pedido en borrador).",
-          tip: "Elige el tipo antes del archivo: al cambiar de tipo se descarta la vista previa y tendrás que volver a elegir el archivo.",
+          tip: "Si cambias de tipo después de elegir el archivo, se vuelve a leer el mismo archivo con el nuevo tipo y se rehace la vista previa.",
         },
         {
           title: "Sube el archivo",
@@ -359,6 +360,7 @@ export const area: HelpArea = {
       summary: "Conecta tu ERP, tu web u otras herramientas con la API de Rentevent.",
       path: "/app/configuracion/api",
       roles: "Administrador",
+      intro: "La API y los webhooks están incluidos en el plan Empresa y durante la prueba gratuita. Con otro plan, la pestaña muestra cómo cambiar de plan; las claves y webhooks que ya tengas se conservan, pero las llamadas responden con error 403 y no se envían avisos.",
       steps: [
         {
           title: "Abre API y webhooks",
@@ -515,6 +517,7 @@ export const area: HelpArea = {
         {
           title: "Indica el número de usuarios",
           text: "Ajusta **Usuarios**. Cada plan muestra su precio por usuario y el coste mensual total, IVA no incluido.",
+          tip: "No puedes contratar menos plazas que los usuarios que ya tienes, ni más de las que admite el plan (Básico hasta 3, Profesional hasta 15). Si no cabe, el plan lo indica y su botón queda desactivado.",
         },
         {
           title: "Compara los planes",
@@ -532,6 +535,7 @@ export const area: HelpArea = {
       ],
       notes: [
         "Cuando quedan 7 días o menos de prueba, verás un aviso en la parte superior con el enlace Elegir plan. Si la suscripción deja de estar activa, el aviso cambia a Reactivar.",
+        "Durante la prueba gratuita puedes usarlo todo, sin límite de usuarios y con la API y los webhooks. Con un plan de pago, solo puedes invitar hasta completar las plazas contratadas (usuarios más invitaciones pendientes), y la API y los webhooks quedan para el plan Empresa.",
       ],
     },
   ],

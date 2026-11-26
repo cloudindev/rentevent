@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Inbox, Mail } from "lucide-react";
-import { and, asc, contacts, desc, emails, emailTemplates, eq, orders, projects } from "@rentevent/db";
+import { and, asc, contacts, desc, emails, emailTemplates, eq, or, orders, projects } from "@rentevent/db";
 import { PageHeader } from "@/components/app/page-header";
 import { Suspense } from "react";
 import { QueryTabs } from "../comunicacion/query-tabs";
@@ -30,7 +30,9 @@ export default async function EmailsPage({ searchParams }: { searchParams: Promi
     const selected = sp.id ? (await tx.select().from(emails).where(eq(emails.id, sp.id)))[0] ?? null : null;
     if (selected && !selected.read) await tx.update(emails).set({ read: true }).where(eq(emails.id, selected.id));
     const list = await tx.select().from(emails).where(where.length ? and(...where) : undefined).orderBy(desc(emails.createdAt)).limit(200);
-    const thread = selected ? await tx.select().from(emails).where(eq(emails.threadId, selected.threadId ?? selected.id)).orderBy(asc(emails.createdAt)) : [];
+    // replies point at the root message's id; the root itself has no threadId
+    const root = selected ? (selected.threadId ?? selected.id) : null;
+    const thread = root ? await tx.select().from(emails).where(or(eq(emails.id, root), eq(emails.threadId, root))).orderBy(asc(emails.createdAt)) : [];
     const [os, ps, cs, tpls] = await Promise.all([
       tx.select({ id: orders.id, label: orders.title, number: orders.number }).from(orders).orderBy(desc(orders.periodStart)).limit(200),
       tx.select({ id: projects.id, label: projects.name, number: projects.number }).from(projects).orderBy(desc(projects.startsAt)).limit(200),

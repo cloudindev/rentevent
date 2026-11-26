@@ -3,7 +3,7 @@ import { addDays, dayKey } from "@rentevent/core";
 import { env } from "../env";
 import type { AppContext } from "@/server/context";
 import { detectIntent, type DateRange } from "@/server/ai/intent";
-import { runTool, TOOL_DEFINITIONS, type ToolResult } from "@/server/ai/tools";
+import { runTool, toolDefinitionsFor, type ToolResult } from "@/server/ai/tools";
 
 export type ChatTurn = { role: "user" | "assistant"; content: string };
 export type AssistantReply = { text: string; links: { label: string; href: string }[]; toolCalls: { name: string; input: unknown; error?: string }[]; provider: "anthropic" | "simulado" };
@@ -63,7 +63,7 @@ async function runAnthropic(ctx: AppContext, history: ChatTurn[], userText: stri
         model,
         max_tokens: 16000,
         system: systemPrompt(ctx),
-        tools: TOOL_DEFINITIONS,
+        tools: toolDefinitionsFor(ctx.role),
         tool_choice: { type: "auto" },
         output_config: { effort: "medium" },
         messages,

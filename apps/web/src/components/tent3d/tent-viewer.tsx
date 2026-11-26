@@ -32,6 +32,7 @@ const ROLE_LABEL: Record<string, string> = {
   pilar: "pilares",
   placa_base: "placas base",
   correa: "correas",
+  tensor: "tensores",
   lona_techo_blanca: "lonas de techo blancas",
   lona_techo_transparente: "lonas de techo transparentes",
   lateral_blanco: "laterales blancos",
@@ -49,6 +50,7 @@ const ROLE_LABEL: Record<string, string> = {
   escenario: "escenario",
   mesa: "mesas",
   silla: "sillas",
+  canalon: "canalones",
   jaima: "jaimas",
 };
 

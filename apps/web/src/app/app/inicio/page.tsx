@@ -56,8 +56,14 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     const understaffed = sh.filter((s) => Number(s.have) < s.need);
 
     const pending = await tx.select().from(orders).where(inArray(orders.status, ["consulta", "opcion", "borrador"])).orderBy(asc(orders.periodStart)).limit(8);
-    const expiring = pending.filter((o) => o.status === "opcion" && o.optionExpiresAt && o.optionExpiresAt.getTime() < now() + 3 * 86_400_000);
-    const sentQuotes = await tx.select({ c: count() }).from(quotes).where(eq(quotes.status, "enviado"));
+    // all options, not only the pending orders listed below
+    const [expiring] = await tx.select({ c: count() }).from(orders).where(and(eq(orders.status, "opcion"), lt(orders.optionExpiresAt, new Date(now() + 3 * 86_400_000))));
+    // latest version of each open order only: older versions are superseded
+    const sentQuotes = await tx
+      .select({ c: count() })
+      .from(quotes)
+      .innerJoin(orders, eq(orders.id, quotes.orderId))
+      .where(and(eq(quotes.status, "enviado"), inArray(orders.status, ["borrador", "consulta", "opcion"]), sql`not exists (select 1 from quotes q2 where q2.order_id = ${quotes.orderId} and q2.version > ${quotes.version})`));
 
     const [billing] = await tx.select({ total: sql<number>`coalesce(sum(${invoices.subtotal}),0)::float`, n: count() }).from(invoices).where(and(gte(invoices.issueDate, monthStart), lte(invoices.issueDate, today), inArray(invoices.status, ["emitida", "cobrada", "vencida"])));
     const [overdue] = await tx.select({ total: sql<number>`coalesce(sum(${invoices.total} - ${invoices.paid}),0)::float` }).from(invoices).where(eq(invoices.status, "vencida"));
@@ -65,11 +71,17 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     const trusses = await tx.select({ id: items.id, sku: items.sku, total: items.stockTotal, repair: items.stockRepair }).from(items).where(and(eq(items.role, "cercha"), eq(items.active, true))).orderBy(asc(items.sku));
     const occ = await weeklyOccupancy(tx, trusses.map((t) => t.id), new Map(trusses.map((t) => [t.id, { total: Number(t.total), repair: Number(t.repair) }])), 8);
 
-    return { ctx, settings, phases, conflicts, understaffed, pending, expiring, sentQuotes: sentQuotes[0]?.c ?? 0, billing, overdue, trusses, occ };
+    return { ctx, settings, phases, conflicts, understaffed, pending, expiring: expiring?.c ?? 0, sentQuotes: sentQuotes[0]?.c ?? 0, billing, overdue, trusses, occ };
   });
   const { ctx } = d;
   const hello = new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", weekday: "long", day: "numeric", month: "long" }).format(new Date());
   const todayKey = dayKey(now());
+  const whenLabel = (start: Date) => {
+    const k = dayKey(start.getTime());
+    // a phase that started before today and is still running
+    if (k < todayKey) return "En curso";
+    return `${k === todayKey ? "Hoy" : "Mañana"} ${formatTime(start)}`;
+  };
   const kpis = [
     { label: "Montajes y desmontajes (48 h)", value: d.phases.filter((p) => p.kind === "montaje" || p.kind === "desmontaje").length, icon: CalendarClock, href: "/app/agenda?vista=semana", tone: "neutral" as const },
     { label: "Conflictos de material (30 d)", value: d.conflicts.length, icon: AlertTriangle, href: "#conflictos", tone: d.conflicts.length ? ("danger" as const) : ("success" as const) },
@@ -109,7 +121,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                   <ul className="divide-y text-sm">
                     {d.phases.map((p) => (
                       <li key={p.id} className="flex items-center gap-3 py-2.5">
-                        <span className="w-24 shrink-0 text-muted-foreground">{dayKey(p.s.getTime()) === todayKey ? "Hoy" : "Mañana"} {formatTime(p.s)}</span>
+                        <span className="w-24 shrink-0 text-muted-foreground">{whenLabel(p.s)}</span>
                         <StatusPill tone={p.kind === "montaje" ? "brand" : p.kind === "desmontaje" ? "warning" : "neutral"}>{PHASE_LABELS[p.kind as PhaseKind]}</StatusPill>
                         <Link href={`/app/proyectos/${p.pid}`} className="min-w-0 flex-1 truncate font-medium hover:underline">{p.name}</Link>
                       </li>
@@ -159,7 +171,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             <Card>
               <CardHeader><CardTitle>Pedidos pendientes</CardTitle><Link href="/app/pedidos" className="text-sm text-link hover:underline">Todos</Link></CardHeader>
               <CardContent>
-                {d.expiring.length > 0 && <p className="mb-2 rounded-lg bg-warning-bg px-3 py-2 text-xs text-warning">{d.expiring.length} opción(es) caducan en menos de 3 días.</p>}
+                {d.expiring > 0 && <p className="mb-2 rounded-lg bg-warning-bg px-3 py-2 text-xs text-warning">{d.expiring} opción(es) caducan en menos de 3 días.</p>}
                 <p className="mb-2 text-xs text-muted-foreground">{d.sentQuotes} presupuestos enviados sin respuesta</p>
                 <ul className="divide-y text-sm">
                   {d.pending.map((o) => (

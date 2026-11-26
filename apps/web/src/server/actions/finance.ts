@@ -25,7 +25,8 @@ const zLine = z.object({
   quantity: z.coerce.number().min(-1e6).max(1e6),
   unitPrice: z.coerce.number().min(-1e8).max(1e8),
   discountPct: z.coerce.number().min(0).max(100).default(0),
-  taxRate: z.coerce.number().refine((v) => [0, 4, 10, 21].includes(v), "IVA no válido"),
+  // any rate the tenant may use (Tarifas allows a general rate of 0–30 %), not just 21/10/4/0
+  taxRate: z.coerce.number().min(0, "IVA no válido").max(30, "IVA no válido").transform((v) => Math.round(v * 100) / 100),
 });
 
 const refresh = (id?: string) => {
@@ -52,7 +53,14 @@ export const createBlankInvoiceAction = tenantAction(z.object({ clientId: z.stri
 });
 
 export const updateDraftInvoiceAction = tenantAction(
-  z.object({ invoiceId: z.string().uuid(), clientId: z.string().uuid().nullable(), lines: z.array(zLine).min(1).max(300), notes: zOptText(2000), dueDate: zIso.nullable() }),
+  z.object({
+    invoiceId: z.string().uuid(),
+    clientId: z.string().uuid().nullable(),
+    seriesId: z.string().uuid().nullable().optional(),
+    lines: z.array(zLine).min(1).max(300),
+    notes: zOptText(2000),
+    dueDate: zIso.nullable(),
+  }),
   "finanzas",
   async (input, tx, ctx) => {
     await updateDraftInvoice(tx, ctx, input);
@@ -157,7 +165,7 @@ const purchaseSchema = z.object({
   concept: z.string().trim().min(2, "Indica el concepto").max(300),
   category: z.enum(["general", "subalquiler", "mantenimiento", "transporte", "personal", "material", "seguros", "suministros"]),
   base: z.coerce.number().min(-1e8).max(1e8),
-  vatRate: z.coerce.number().refine((v) => [0, 4, 10, 21].includes(v)),
+  vatRate: z.coerce.number().min(0, "IVA no válido").max(30, "IVA no válido"),
 });
 
 export const savePurchaseAction = tenantAction(purchaseSchema, "finanzas", async (input, tx, ctx) => {
@@ -187,6 +195,11 @@ export const savePurchaseAction = tenantAction(purchaseSchema, "finanzas", async
   if (input.id) {
     const [before] = await tx.select().from(purchases).where(eq(purchases.id, input.id));
     if (!before) throw new UserError("Compra no encontrada");
+    if (before.status === "pagada" && Math.abs(Number(before.total) - values.total) >= 0.005) {
+      // the payment's bank movement holds the old amount: don't let the two drift apart silently
+      const [mov] = await tx.select({ id: bankMovements.id }).from(bankMovements).where(eq(bankMovements.purchaseId, before.id)).limit(1);
+      if (mov) throw new UserError("Esta compra está pagada con un movimiento bancario conciliado: deshaz la conciliación en Tesorería antes de cambiar el importe");
+    }
     await tx.update(purchases).set(values).where(eq(purchases.id, input.id));
     await audit(tx, ctx, "purchase", input.id, "editar", { total: { de: before.total, a: values.total } });
   } else {

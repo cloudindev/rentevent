@@ -21,11 +21,15 @@ const venueSchema = z.object({
 });
 
 export const saveVenue = tenantAction(venueSchema, "comercial", async (input, tx, ctx) => {
-  const g = await geocode([input.address, input.city].filter(Boolean).join(", "));
-  const values = { ...input, id: undefined, contactId: input.contactId || null, lat: g?.lat ?? null, lng: g?.lng ?? null };
-  if (input.id) {
-    const [before] = await tx.select().from(venues).where(eq(venues.id, input.id));
-    if (!before) throw new UserError("Espacio no encontrado");
+  const [before] = input.id ? await tx.select().from(venues).where(eq(venues.id, input.id)) : [];
+  if (input.id && !before) throw new UserError("Espacio no encontrado");
+  // geocode only when the address changed (or was never located); a failed lookup keeps the known position
+  const addressChanged = !before || (before.address ?? "") !== input.address || (before.city ?? "") !== input.city || before.lat == null || before.lng == null;
+  const query = [input.address, input.city].filter(Boolean).join(", ");
+  const g = addressChanged && query ? await geocode(query) : null;
+  const position = g ? { lat: g.lat, lng: g.lng } : before && query ? { lat: before.lat, lng: before.lng } : { lat: null, lng: null };
+  const values = { ...input, id: undefined, contactId: input.contactId || null, ...position };
+  if (input.id && before) {
     const [after] = await tx.update(venues).set(values).where(eq(venues.id, input.id)).returning();
     await audit(tx, ctx, "venue", input.id, "editar", diffOf(before, after));
     revalidatePath("/app/espacios", "layout");

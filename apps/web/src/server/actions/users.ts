@@ -10,6 +10,7 @@ import { ROLE_LABELS } from "@/lib/permissions";
 import { audit } from "../audit";
 import { tenantAction, UserError } from "../action";
 import { getAuthSession } from "../context";
+import { assertSeatAvailable } from "../billing/tenant-access";
 
 const INVITE_DAYS = 7;
 
@@ -32,6 +33,7 @@ export const inviteUser = tenantAction(z.object({ email: z.string().trim().toLow
   const db = systemDb();
   const [already] = await db.select({ id: member.id }).from(member).innerJoin(user, eq(user.id, member.userId)).where(and(eq(member.organizationId, ctx.tenantId), eq(user.email, email)));
   if (already) throw new UserError("Esa persona ya forma parte de la empresa.");
+  await assertSeatAvailable(tx, ctx.tenantId, { email });
   await db.update(invitation).set({ status: "canceled" }).where(and(eq(invitation.organizationId, ctx.tenantId), eq(invitation.email, email), eq(invitation.status, "pending")));
   const id = randomBytes(16).toString("hex");
   await db.insert(invitation).values({ id, organizationId: ctx.tenantId, email, role, status: "pending", expiresAt: new Date(Date.now() + INVITE_DAYS * 86_400_000), inviterId: ctx.user.id });
@@ -45,6 +47,7 @@ export const resendInvitation = tenantAction(z.object({ id: z.string().min(8) })
   const db = systemDb();
   const [inv] = await db.select().from(invitation).where(and(eq(invitation.id, id), eq(invitation.organizationId, ctx.tenantId)));
   if (!inv) throw new UserError("Invitación no encontrada");
+  await assertSeatAvailable(tx, ctx.tenantId, { invitationId: inv.id });
   await db.update(invitation).set({ status: "pending", expiresAt: new Date(Date.now() + INVITE_DAYS * 86_400_000) }).where(eq(invitation.id, id));
   await sendInvite(inv, ctx.tenantName, ctx.user.name);
   await audit(tx, ctx, "invitation", id, "enviar");

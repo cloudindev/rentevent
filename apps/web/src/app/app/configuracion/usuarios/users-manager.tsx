@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useState, useTransition } from "react";
 import { Check, Mail, RotateCw, Trash2, UserPlus, X } from "lucide-react";
@@ -16,14 +17,28 @@ import { changeRole, inviteUser, removeMember, resendInvitation, revokeInvitatio
 import { saveFieldPermissions } from "@/server/actions/settings";
 
 type M = { id: string; userId: string; role: string; createdAt: string; name: string; email: string };
-type I = { id: string; email: string; role: string; expiresAt: string };
+type I = { id: string; email: string; role: string; expiresAt: string; expired: boolean };
 const FIELDS = [
   { key: "margen", label: "Margen" },
   { key: "coste", label: "Costes" },
   { key: "coste_hora", label: "Coste/hora personal" },
 ] as const;
 
-export function UsersManager({ me, members, invitations, fieldPermissions }: { me: string; members: M[]; invitations: I[]; fieldPermissions: Record<string, Record<string, boolean>> }) {
+export function UsersManager({
+  me,
+  members,
+  invitations,
+  fieldPermissions,
+  seats,
+}: {
+  me: string;
+  members: M[];
+  invitations: I[];
+  fieldPermissions: Record<string, Record<string, boolean>>;
+  /** Seats of the paid plan (members + live invitations); null during the trial or without a plan. */
+  seats: { used: number; limit: number } | null;
+}) {
+  const full = seats != null && seats.used >= seats.limit;
   const router = useRouter();
   const [pending, start] = useTransition();
   const [email, setEmail] = useState("");
@@ -45,7 +60,10 @@ export function UsersManager({ me, members, invitations, fieldPermissions }: { m
         <CardHeader>
           <div>
             <CardTitle>Invitar a una persona</CardTitle>
-            <CardDescription>Recibirá un correo con un enlace válido 7 días.</CardDescription>
+            <CardDescription>
+              Recibirá un correo con un enlace válido 7 días.
+              {seats && ` Plazas: ${seats.used} de ${seats.limit} (usuarios e invitaciones pendientes).`}
+            </CardDescription>
           </div>
         </CardHeader>
         <CardContent>
@@ -71,15 +89,20 @@ export function UsersManager({ me, members, invitations, fieldPermissions }: { m
                 {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
               </NativeSelect>
             </Field>
-            <Button disabled={pending || !email}><UserPlus /> Invitar</Button>
+            <Button disabled={pending || !email || full}><UserPlus /> Invitar</Button>
           </form>
+          {full && (
+            <p className="mt-3 text-sm text-muted-foreground">
+              Has ocupado todas las plazas de tu plan. <Link className="text-link hover:underline" href="/app/configuracion/suscripcion">Amplía la suscripción</Link> o anula una invitación pendiente para invitar a otra persona.
+            </p>
+          )}
           {invitations.length > 0 && (
             <ul className="mt-4 divide-y rounded-lg border text-sm">
               {invitations.map((i) => (
                 <li key={i.id} className="flex flex-wrap items-center gap-3 px-3 py-2">
                   <Mail className="size-4 text-muted-foreground" />
-                  <span className="flex-1">{i.email} <span className="text-muted-foreground">· {ROLE_LABELS[i.role as Role] ?? i.role} · caduca {formatDate(i.expiresAt)}</span></span>
-                  <StatusPill tone="warning">Pendiente</StatusPill>
+                  <span className="flex-1">{i.email} <span className="text-muted-foreground">· {ROLE_LABELS[i.role as Role] ?? i.role} · {i.expired ? "caducó" : "caduca"} {formatDate(i.expiresAt)}</span></span>
+                  {i.expired ? <StatusPill tone="neutral">Caducada</StatusPill> : <StatusPill tone="warning">Pendiente</StatusPill>}
                   <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(() => resendInvitation({ id: i.id }), "Invitación reenviada")}><RotateCw /> Reenviar</Button>
                   <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(() => revokeInvitation({ id: i.id }), "Invitación anulada")}><X /> Anular</Button>
                 </li>

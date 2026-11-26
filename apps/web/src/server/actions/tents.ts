@@ -82,11 +82,23 @@ export const saveRules = tenantAction(rulesInput, "carpas", async (input, tx, ct
   return { count: input.rules.length };
 });
 
+/** First free "<code>-C<n>" that fits the 16-character limit of family codes. */
+function copyCode(code: string, taken: Set<string>): string {
+  for (let n = 1; n < 1000; n++) {
+    const suffix = `-C${n}`;
+    const candidate = `${code.slice(0, 16 - suffix.length)}${suffix}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+  throw new UserError("No se ha podido generar un código libre para la copia.");
+}
+
 export const duplicateFamily = tenantAction(z.object({ id: z.string().uuid() }), "carpas", async ({ id }, tx, ctx) => {
   const [f] = await tx.select().from(structureFamilies).where(eq(structureFamilies.id, id));
   if (!f) throw new UserError("Familia no encontrada");
   const { id: _id, createdAt: _c, updatedAt: _u, tenantId: _t, ...rest } = f;
-  const [copy] = await tx.insert(structureFamilies).values({ ...rest, code: `${f.code}-C${Date.now() % 1000}`, name: `${f.name} (copia)` }).returning();
+  const taken = new Set((await tx.select({ code: structureFamilies.code }).from(structureFamilies)).map((r) => r.code));
+  const code = copyCode(f.code, taken);
+  const [copy] = await tx.insert(structureFamilies).values({ ...rest, code, name: `${f.name} (copia)`.slice(0, 80) }).returning();
   const rules = await tx.select().from(bomRules).where(eq(bomRules.familyId, id));
   if (rules.length) await tx.insert(bomRules).values(rules.map(({ id: _i, createdAt: _a, updatedAt: _b, tenantId: _tt, ...r }) => ({ ...r, familyId: copy!.id })));
   await audit(tx, ctx, "structure_family", copy!.id, "crear", { copiaDe: id });
@@ -98,6 +110,15 @@ export const deleteFamily = tenantAction(z.object({ id: z.string().uuid() }), "c
   await tx.update(structureFamilies).set({ active: false }).where(eq(structureFamilies.id, id));
   await audit(tx, ctx, "structure_family", id, "borrar");
   revalidatePath("/app/carpas");
+  return { id };
+});
+
+export const reactivateFamily = tenantAction(z.object({ id: z.string().uuid() }), "carpas", async ({ id }, tx, ctx) => {
+  const [row] = await tx.update(structureFamilies).set({ active: true }).where(eq(structureFamilies.id, id)).returning({ id: structureFamilies.id });
+  if (!row) throw new UserError("Familia no encontrada");
+  await audit(tx, ctx, "structure_family", id, "editar", { active: { de: false, a: true } });
+  revalidatePath("/app/carpas");
+  revalidatePath(`/app/carpas/${id}`);
   return { id };
 });
 
@@ -115,7 +136,7 @@ export const saveManufacturerData = tenantAction(wizardInput, "carpas", async (i
       .set({ parameters: { ...(cur.parameters ?? {}), ...f.parameters }, labor: { ...DEFAULT_LABOR, ...(cur.labor as object), ...f.labor }, parametersPending: false })
       .where(eq(structureFamilies.id, f.id));
   }
-  await tx.update(tenantSettings).set({ manufacturerWizardDone: true });
+  await tx.update(tenantSettings).set({ manufacturerWizardDone: true }).where(eq(tenantSettings.tenantId, ctx.tenantId));
   await audit(tx, ctx, "tenant", ctx.tenantId, "editar", { asistenteFabricante: true });
   revalidatePath("/app/carpas");
   return { ok: true };

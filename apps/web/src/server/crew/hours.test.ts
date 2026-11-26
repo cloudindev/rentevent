@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aggregateDays, payrollCsv, trainingStatus, workedHours } from "./hours";
+import { aggregateDays, mergeShiftReports, payrollCsv, trainingStatus, workedHours } from "./hours";
 import { buildIcs, icsToken, verifyIcsToken } from "./ics";
 import { blockPosition, dayBlockPosition, madridMidnight, shiftKey, stackLanes, weekRange } from "./board";
 
@@ -93,5 +93,28 @@ describe("dayBlockPosition", () => {
   });
   it("ignores blocks outside the week", () => {
     expect(dayBlockPosition(at("2026-11-30", 8), at("2026-11-30", 10), range)).toBeNull();
+  });
+});
+
+describe("mergeShiftReports", () => {
+  const base = { incidents: null, clientName: null, clientSignature: null, completedAt: null };
+  it("merges every worker's report into one parte per shift", () => {
+    const m = mergeShiftReports(
+      [
+        { ...base, workerName: "Ana", checklist: [{ label: "Anclajes", done: true }, { label: "Lonas", done: false }], incidents: "Falta una piqueta", updatedAt: d("2026-12-10T10:00:00Z") },
+        { ...base, workerName: "Luis", checklist: [{ label: "Anclajes", done: false }, { label: "Lonas", done: true }], incidents: "  ", clientName: "Marta", clientSignature: "data:image/png;base64,AAA", completedAt: d("2026-12-10T12:00:00Z"), updatedAt: d("2026-12-10T12:00:00Z") },
+      ],
+      ["Anclajes", "Lonas"],
+    );
+    expect(m.checklist).toEqual([{ label: "Anclajes", done: true }, { label: "Lonas", done: true }]);
+    expect(m.incidents).toEqual([{ workerName: "Ana", text: "Falta una piqueta" }]);
+    expect(m.clientName).toBe("Marta");
+    expect(m.clientSignature).toBe("data:image/png;base64,AAA");
+    expect(m.completed).toBe(1);
+  });
+  it("falls back to the shift checklist when nobody filed a report", () => {
+    const m = mergeShiftReports([], ["Anclajes"]);
+    expect(m.checklist).toEqual([{ label: "Anclajes", done: false }]);
+    expect(m.clientSignature).toBeNull();
   });
 });

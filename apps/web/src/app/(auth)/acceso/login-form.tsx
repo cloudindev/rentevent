@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/menu";
 
-export function LoginForm() {
+/** `accent`: the company's brand colour on /acceso/[slug] (button background and its readable text colour). */
+export function LoginForm({ accent }: { accent?: { bg: string; fg: string } | null } = {}) {
   const router = useRouter();
   const params = useSearchParams();
   const next = params.get("next") ?? "/app/inicio";
@@ -17,17 +18,23 @@ export function LoginForm() {
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [unverified, setUnverified] = useState(false);
+  const [resend, setResend] = useState<"idle" | "sending" | "sent" | "error">("idle");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setUnverified(false);
+    setResend("idle");
     const { data, error } = await authClient.signIn.email({ email, password, rememberMe: remember });
     setLoading(false);
     if (error) {
+      const needsVerification = error.status === 403 && /verif/i.test(error.message ?? "");
+      setUnverified(needsVerification);
       setError(
-        error.status === 403 && /verif/i.test(error.message ?? "")
-          ? "Confirma tu correo antes de entrar. Te hemos reenviado el enlace."
+        needsVerification
+          ? "Confirma tu correo antes de entrar: abre el enlace que te enviamos al registrarte."
           : error.status === 429
             ? "Demasiados intentos seguidos. Espera unos segundos y vuelve a probar."
             : "Correo o contraseña incorrectos.",
@@ -37,6 +44,12 @@ export function LoginForm() {
     if (data && "twoFactorRedirect" in data && data.twoFactorRedirect) return;
     router.push(safeNext);
     router.refresh();
+  }
+
+  async function resendLink() {
+    setResend("sending");
+    const { error } = await authClient.sendVerificationEmail({ email, callbackURL: safeNext });
+    setResend(error ? "error" : "sent");
   }
 
   return (
@@ -57,11 +70,23 @@ export function LoginForm() {
           </Link>
         </div>
         {error && (
-          <p role="alert" className="rounded-lg bg-danger-bg px-3 py-2 text-sm text-danger">
-            {error}
-          </p>
+          <div role="alert" className="space-y-1 rounded-lg bg-danger-bg px-3 py-2 text-sm text-danger">
+            <p>{error}</p>
+            {unverified &&
+              (resend === "sent" ? (
+                <p>Te hemos enviado un enlace nuevo a {email}. Revisa también la carpeta de spam.</p>
+              ) : (
+                <p>
+                  ¿No lo encuentras?{" "}
+                  <button type="button" className="font-medium underline disabled:opacity-60" disabled={resend === "sending"} onClick={resendLink}>
+                    {resend === "sending" ? "Enviando…" : "Reenviar el enlace"}
+                  </button>
+                  {resend === "error" && " · No se ha podido enviar. Espera un momento y vuelve a probar."}
+                </p>
+              ))}
+          </div>
         )}
-        <Button type="submit" className="w-full" size="lg" disabled={loading}>
+        <Button type="submit" className={accent ? "w-full hover:opacity-90" : "w-full"} size="lg" disabled={loading} style={accent ? { backgroundColor: accent.bg, borderColor: accent.bg, color: accent.fg } : undefined}>
           {loading ? "Entrando…" : "Iniciar sesión"}
         </Button>
       </form>

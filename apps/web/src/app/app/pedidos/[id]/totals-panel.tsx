@@ -49,7 +49,7 @@ export function TotalsPanel({ totals, rows, showMargin, shortTotal, order, days 
               {formatEUR(totals.margin)} · {totals.marginPct} %
             </span>
           </div>
-          <p className="mt-1 text-[11px] text-muted-foreground">Personal, transporte y subalquiler. Solo visible para roles autorizados.</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">Precio de coste de los artículos sueltos y coste de las líneas de servicio, transporte y montaje. No incluye carpas, kits ni subalquileres. Solo visible para roles autorizados.</p>
         </div>
       )}
     </section>

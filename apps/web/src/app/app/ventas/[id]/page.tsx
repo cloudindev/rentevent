@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Receipt, ShieldCheck } from "lucide-react";
-import { contacts, eq } from "@rentevent/db";
+import { asc, contacts, eq, invoiceSeries } from "@rentevent/db";
 import { PageBody, PageHeader } from "@/components/app/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,8 @@ import { InvoiceStatus, PAYMENT_METHODS } from "@/components/finance/status";
 import { formatDate, formatEUR, formatNumber } from "@/lib/utils";
 import { tenantDb } from "@/server/context";
 import { invoiceTotals, lineNet } from "@/server/finance/calc";
-import { INVOICE_KIND_LABELS, clientSnapshot, parseLines, type ClientSnapshot } from "@/server/finance/invoicing";
+import { INVOICE_KIND_LABELS, SERIES_CODE, clientSnapshot, parseLines, type ClientSnapshot, type InvoiceKind } from "@/server/finance/invoicing";
+import { tenantPricing } from "@/server/orders";
 import { bankAccountOptions, clientOptions, invoiceDetail } from "@/server/finance/queries";
 
 export const metadata: Metadata = { title: "Factura" };
@@ -24,13 +25,22 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const data = await tenantDb(async (tx) => {
     const d = await invoiceDetail(tx, id);
     if (!d) return null;
-    const [clients, accounts, email, liveClient] = await Promise.all([
+    const draft = !d.inv.fullNumber;
+    const [clients, accounts, email, liveClient, series, pricing] = await Promise.all([
       clientOptions(tx),
       bankAccountOptions(tx),
       d.inv.clientId ? tx.select({ email: contacts.email }).from(contacts).where(eq(contacts.id, d.inv.clientId)).then((r) => r[0]?.email ?? null) : null,
       d.inv.clientSnapshot ? null : clientSnapshot(tx, d.inv.clientId),
+      draft
+        ? tx
+            .select({ id: invoiceSeries.id, code: invoiceSeries.code, name: invoiceSeries.name, year: invoiceSeries.year })
+            .from(invoiceSeries)
+            .where(eq(invoiceSeries.kind, d.inv.kind))
+            .orderBy(asc(invoiceSeries.code))
+        : [],
+      draft ? tenantPricing(tx).then((p) => p.pricing.vatRate) : 21,
     ]);
-    return { ...d, clients, accounts, email, liveClient };
+    return { ...d, clients, accounts, email, liveClient, series, generalVat: pricing };
   }, "finanzas");
   if (!data) notFound();
   const { inv } = data;
@@ -38,6 +48,16 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const totals = invoiceTotals(lines);
   const draft = !inv.fullNumber;
   const client = (inv.clientSnapshot as ClientSnapshot | null) ?? data.liveClient;
+  // custom series of this kind, one entry per code (the issue year's series is used when it is emitted)
+  const defaultCode = SERIES_CODE[inv.kind as InvoiceKind];
+  const year = new Date().getFullYear();
+  const byCode = new Map<string, (typeof data.series)[number]>();
+  for (const s of data.series) {
+    if (s.code === defaultCode && s.id !== inv.seriesId) continue;
+    const prev = byCode.get(s.code);
+    if (s.id === inv.seriesId || !prev || (prev.id !== inv.seriesId && Math.abs(s.year - year) < Math.abs(prev.year - year))) byCode.set(s.code, s);
+  }
+  const pickableSeries = [...byCode.values()];
   const title = `${INVOICE_KIND_LABELS[inv.kind] ?? "Factura"} ${inv.fullNumber ?? "· borrador"}`;
 
   return (
@@ -58,7 +78,14 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                   <CardTitle>Borrador</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <InvoiceEditor invoiceId={inv.id} clients={data.clients} initial={{ clientId: inv.clientId, lines, notes: inv.notes, dueDate: inv.dueDate }} />
+                  <InvoiceEditor
+                    invoiceId={inv.id}
+                    clients={data.clients}
+                    series={pickableSeries}
+                    defaultSeriesCode={defaultCode}
+                    generalVat={data.generalVat}
+                    initial={{ clientId: inv.clientId, seriesId: inv.seriesId, lines, notes: inv.notes, dueDate: inv.dueDate }}
+                  />
                 </CardContent>
               </Card>
             ) : (

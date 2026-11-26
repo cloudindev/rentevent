@@ -15,7 +15,7 @@ export const area: HelpArea = {
     { term: "Fijar arriba", definition: "Opción que coloca un aviso al principio de la lista, marcado con una chincheta." },
     { term: "Nota interna", definition: "Comentario escrito en la ficha de un pedido, proyecto, contacto o artículo." },
     { term: "Canal", definition: "Vía de envío de una notificación: Push (app), Correo, WhatsApp o Interno." },
-    { term: "Estado de la notificación", definition: "enviada, simulada (sin claves configuradas), error o sin dispositivo (push a alguien que no ha activado los avisos en su móvil)." },
+    { term: "Estado de la notificación", definition: "Enviada, Simulada (sin claves configuradas), Error o Sin dispositivo (push a alguien que no ha activado los avisos en su móvil)." },
   ],
   articles: [
     {
@@ -31,7 +31,10 @@ export const area: HelpArea = {
         { title: "Publica", text: "Pulsa **Publicar**. El aviso aparece en la lista con tu nombre y la fecha." },
         { title: "Edita o borra", text: "Usa los iconos **Editar aviso** y **Eliminar aviso** de cada aviso. Al borrar te pedirá confirmación." },
       ],
-      notes: ["Un aviso del tablón no envía notificaciones a los móviles. Para avisar directamente a personas concretas usa **Enviar aviso**."],
+      notes: [
+        "Un aviso del tablón no envía notificaciones a los móviles. Para avisar directamente a personas concretas usa **Enviar aviso**.",
+        "Publican, editan y borran avisos los administradores, comerciales, jefes de almacén y jefes de equipo. El rol Solo lectura puede leerlos pero no ve **Nuevo aviso** ni los iconos de editar y borrar.",
+      ],
     },
     {
       slug: "enviar-aviso-trabajadores",
@@ -72,9 +75,9 @@ export const area: HelpArea = {
       steps: [
         { title: "Abre el registro", text: "En **Comunicación**, pulsa **Registro de notificaciones**." },
         { title: "Filtra por canal", text: "Pulsa **Todos los canales**, **Push**, **Correo**, **WhatsApp** o **Interno**." },
-        { title: "Filtra por estado", text: "Pulsa **Todos los estados**, **enviada**, **simulada** o **error**. Los dos filtros se combinan." },
+        { title: "Filtra por estado", text: "Pulsa **Todos los estados**, **Enviada**, **Simulada**, **Error** o **Sin dispositivo**. Los dos filtros se combinan." },
         { title: "Revisa cada envío", text: "La tabla muestra **Fecha**, **Canal**, **Destinatario**, **Mensaje** y **Estado**. Si el aviso trata de un pedido, proyecto, contacto o artículo, hay un enlace para abrirlo." },
-        { title: "Interpreta el estado", text: "**simulada** significa que faltan las claves de ese canal; **error** que el proveedor lo rechazó; **sin dispositivo** que la persona no tiene los avisos push activados en ningún móvil." },
+        { title: "Interpreta el estado", text: "**Simulada** significa que faltan las claves de ese canal; **Error** que el proveedor lo rechazó; **Sin dispositivo** que la persona no tiene los avisos push activados en ningún móvil." },
       ],
       notes: ["Se muestran las 300 notificaciones más recientes que cumplen el filtro."],
     },

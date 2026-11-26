@@ -68,6 +68,16 @@ export function weekStart(t: number): number {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - day);
 }
 
+/** Higher licences include the lower ones: C+E drives C and B vehicles, C drives B vehicles. */
+const LICENCE_COVERS: Record<string, string[]> = {
+  conductor_b: ["conductor_b", "conductor_c", "conductor_ce"],
+  conductor_c: ["conductor_c", "conductor_ce"],
+  conductor_ce: ["conductor_ce"],
+};
+export function canDrive(skills: readonly string[], required: string): boolean {
+  return (LICENCE_COVERS[required] ?? [required]).some((l) => skills.includes(l));
+}
+
 export function checkAssignment(input: {
   worker: WorkerInfo;
   shift: ShiftInfo;
@@ -139,7 +149,7 @@ export function checkAssignment(input: {
 
   if (shift.vehicleLicence) {
     const crew = [...(input.crewOnShift ?? []).filter((w) => w.id !== worker.id), worker];
-    if (!crew.some((w) => w.skills.includes(shift.vehicleLicence!))) {
+    if (!crew.some((w) => canDrive(w.skills, shift.vehicleLicence!))) {
       out.push({
         code: "sin_conductor",
         severity: "warning",
@@ -193,13 +203,15 @@ export function suggestCrew(input: { shift: ShiftInfo; workers: WorkerInfo[]; ex
 }
 
 export type PhaseKind = "carga" | "transporte" | "montaje" | "evento" | "desmontaje" | "retorno";
-export const PHASE_LABELS: Record<PhaseKind, string> = {
+/** Labels for project phases and shift phases ("otro" exists only on manual shifts). */
+export const PHASE_LABELS: Record<PhaseKind | "otro", string> = {
   carga: "Carga",
   transporte: "Transporte",
   montaje: "Montaje",
   evento: "Evento",
   desmontaje: "Desmontaje",
   retorno: "Retorno",
+  otro: "Otro",
 };
 
 /** Crew need for a project phase derived from estimated person-hours. */

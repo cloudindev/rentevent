@@ -14,8 +14,11 @@ import {
   items,
   jobReports,
   lt,
+  member,
+  projects,
   shifts,
   timeEntries,
+  user,
   workerUnavailability,
   workers,
   withTenant,
@@ -23,6 +26,7 @@ import {
 } from "@rentevent/db";
 import { checkAssignment, hasBlockingConflict, suggestCrew, type Conflict } from "@rentevent/core";
 import { tenantAction, UserError, zId, zOptText, zText } from "../action";
+import { can, canSeeField } from "@/lib/permissions";
 import { audit, diffOf } from "../audit";
 import { getAppContext } from "../context";
 import { geocode } from "@/lib/adapters/maps";
@@ -46,7 +50,7 @@ const workerSchema = z.object({
   type: z.enum(["plantilla", "eventual", "autonomo"]),
   skills: z.array(z.string().max(40)).max(20),
   trainingExpiresAt: z.union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)]).optional().nullable(),
-  costPerHour: z.coerce.number().min(0).max(500),
+  costPerHour: z.coerce.number().min(0).max(500).optional(),
   weeklyHoursLimit: z.coerce.number().int().min(1).max(80),
   address: zOptText(300),
   color: zOptText(20),
@@ -67,13 +71,15 @@ export const saveWorker = tenantAction(workerSchema, "personal", async (input, t
     type: input.type,
     skills: input.skills,
     trainingExpiresAt: input.trainingExpiresAt || null,
-    costPerHour: input.costPerHour,
     weeklyHoursLimit: input.weeklyHoursLimit,
     address: input.address,
     homeLat,
     homeLng,
     color: input.color,
     active: input.active,
+    // the hourly cost is only written by someone allowed to see it; otherwise it stays as it was
+    // (or takes the column default on a new worker)
+    ...(input.costPerHour !== undefined && canSeeField(ctx.role, "coste_hora", ctx.fieldPermissions) ? { costPerHour: input.costPerHour } : {}),
   };
   if (input.id) {
     const [before] = await tx.select().from(workers).where(eq(workers.id, input.id));
@@ -328,16 +334,37 @@ export const clockOut = tenantAction(z.object({ at: zWhen, breakMinutes: z.coerc
 
 export const respondShift = tenantAction(z.object({ shiftId: zId, status: z.enum(["confirmado", "rechazado"]) }), "fichar", async (input, tx, ctx) => {
   const w = await myWorker(tx, ctx.user.id);
-  const [a] = await tx
-    .update(assignments)
-    .set({ status: input.status })
-    .where(and(eq(assignments.shiftId, input.shiftId), eq(assignments.workerId, w.id)))
-    .returning();
-  if (!a) throw new UserError("No estás asignado a este turno.");
+  const where = and(eq(assignments.shiftId, input.shiftId), eq(assignments.workerId, w.id));
+  const [before] = await tx.select({ status: assignments.status }).from(assignments).where(where);
+  if (!before) throw new UserError("No estás asignado a este turno.");
+  await tx.update(assignments).set({ status: input.status }).where(where);
   await audit(tx, ctx, "shift", input.shiftId, "estado", { trabajador: w.name, respuesta: input.status });
+  if (input.status === "rechazado" && before.status !== "rechazado") await notifyRejection(tx, ctx.tenantId, input.shiftId, w.name);
   revalidateCrew();
   return { status: input.status };
 });
+
+/** Tells the planners (users who can plan staff, plus the project manager) that a worker turned a shift down. */
+async function notifyRejection(tx: Tx, tenantId: string, shiftId: string, workerName: string) {
+  const [s] = await tx.select({ id: shifts.id, title: shifts.title, startsAt: shifts.startsAt, managerId: projects.managerId }).from(shifts).leftJoin(projects, eq(projects.id, shifts.projectId)).where(eq(shifts.id, shiftId));
+  if (!s) return;
+  const staff = await tx.select({ userId: member.userId, role: member.role, name: user.name, email: user.email }).from(member).innerJoin(user, eq(user.id, member.userId)).where(eq(member.organizationId, tenantId));
+  const planners = staff.filter((m) => can(m.role, "personal") || m.userId === s.managerId);
+  const when = new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }).format(s.startsAt);
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(s.startsAt);
+  for (const p of planners) {
+    await notify(tx, {
+      channel: p.email ? "email" : "interno",
+      recipient: p.email || p.name,
+      userId: p.userId,
+      title: `Turno rechazado · ${workerName}`,
+      body: `${workerName} ha rechazado el turno «${s.title}» del ${when}. Busca un sustituto en el tablero de personal.`,
+      entity: "shift",
+      entityId: s.id,
+      url: `${env.appUrl}/app/personal/tablero?fecha=${day}`,
+    });
+  }
+}
 
 export const submitJobReport = tenantAction(
   z.object({

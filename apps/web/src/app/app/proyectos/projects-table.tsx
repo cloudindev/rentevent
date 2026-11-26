@@ -34,7 +34,7 @@ export function ProjectsTable({ rows, views, clients, venues, canCreate, openNew
       { accessorKey: "startsAt", header: "Fechas", cell: ({ row }) => <span className="whitespace-nowrap">{formatRange(row.original.startsAt, row.original.endsAt)}</span> },
       { accessorKey: "status", header: "Estado", filterFn: "equalsString", cell: ({ getValue }) => { const s = ORDER_STATUS[getValue() as string]; return <StatusPill tone={s?.tone ?? "neutral"}>{s?.label ?? (getValue() as string)}</StatusPill>; } },
       { accessorKey: "orders", header: "Pedidos", meta: { align: "right" } },
-      { accessorKey: "value", header: "Valor", meta: { align: "right" }, cell: ({ getValue }) => formatEUR(getValue() as number) },
+      { accessorKey: "value", header: "Valor (sin IVA)", meta: { align: "right" }, cell: ({ getValue }) => formatEUR(getValue() as number) },
     ],
     [],
   );

@@ -39,7 +39,7 @@ export default async function TaxesPage() {
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold">Series de facturación {year}</h2>
-          <Link href="/app/ventas?tab=series" className="text-sm text-link hover:underline">Gestionar series</Link>
+          <Link href="/app/ventas?vista=series" className="text-sm text-link hover:underline">Gestionar series</Link>
         </div>
         <Table>
           <THead><TR><TH>Serie</TH><TH>Nombre</TH><TH>Tipo</TH><TH className="text-right">Próximo número</TH></TR></THead>

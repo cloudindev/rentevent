@@ -65,9 +65,26 @@ export async function PickListsView({ kind }: { kind: PickKind }) {
     const statuses = kind === "salida" ? ["confirmado", "opcion"] : ["en_curso"];
     const since = new Date(nowMs() - 30 * 86_400_000);
     const pending = await tx
-      .select({ id: orders.id, number: orders.number, title: orders.title, periodStart: orders.periodStart, periodEnd: orders.periodEnd, status: orders.status })
+      .select({
+        id: orders.id,
+        number: orders.number,
+        title: orders.title,
+        periodStart: orders.periodStart,
+        periodEnd: orders.periodEnd,
+        status: orders.status,
+        // an order still on site after a partial return: the rest is received on a follow-up list
+        partial: sql<boolean>`exists (select 1 from pick_lists p where p.order_id = ${orders.id} and p.kind = ${kind} and p.status = 'devuelto')`,
+      })
       .from(orders)
-      .where(and(inArray(orders.status, statuses), gte(kind === "salida" ? orders.periodStart : orders.periodEnd, since), sql`not exists (select 1 from pick_lists p where p.order_id = ${orders.id} and p.kind = ${kind})`))
+      .where(
+        and(
+          inArray(orders.status, statuses),
+          gte(kind === "salida" ? orders.periodStart : orders.periodEnd, since),
+          kind === "retorno"
+            ? sql`not exists (select 1 from pick_lists p where p.order_id = ${orders.id} and p.kind = ${kind} and p.status <> 'devuelto')`
+            : sql`not exists (select 1 from pick_lists p where p.order_id = ${orders.id} and p.kind = ${kind})`,
+        ),
+      )
       .orderBy(asc(kind === "salida" ? orders.periodStart : orders.periodEnd));
     return { lists, lines, pending, canWork: can(ctx.role, "almacen") };
   });
@@ -87,14 +104,15 @@ export async function PickListsView({ kind }: { kind: PickKind }) {
       <PageBody>
         {d.pending.length > 0 && (
           <section className="rounded-xl border bg-card p-4">
-            <h2 className="text-sm font-semibold">{kind === "salida" ? "Pedidos confirmados sin lista de carga" : "Pedidos en obra sin lista de retorno"}</h2>
+            <h2 className="text-sm font-semibold">{kind === "salida" ? "Pedidos confirmados sin lista de carga" : "Pedidos en obra sin retorno abierto"}</h2>
             <ul className="mt-2 divide-y text-sm">
               {d.pending.map((o) => (
                 <li key={o.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                   <span>
                     <span className="tabular text-muted-foreground">{o.number}</span> · {o.title} <span className="text-muted-foreground">· {formatRange(o.periodStart, o.periodEnd)}</span>
+                    {o.partial && <span className="text-warning"> · retorno parcial, falta material</span>}
                   </span>
-                  {d.canWork && <OpenListButton orderId={o.id} kind={kind} />}
+                  {d.canWork && <OpenListButton orderId={o.id} kind={kind} label={o.partial ? "Recibir lo pendiente" : undefined} />}
                 </li>
               ))}
             </ul>

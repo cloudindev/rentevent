@@ -46,7 +46,7 @@ export const INVOICE_STATUS_LABELS: Record<string, string> = {
   anulada: "Anulada",
 };
 export const INVOICE_KIND_LABELS: Record<string, string> = { normal: "Factura", anticipo: "Anticipo", rectificativa: "Rectificativa" };
-const SERIES_CODE: Record<InvoiceKind, string> = { normal: "F", anticipo: "A", rectificativa: "R" };
+export const SERIES_CODE: Record<InvoiceKind, string> = { normal: "F", anticipo: "A", rectificativa: "R" };
 const SERIES_NAME: Record<InvoiceKind, string> = { normal: "Facturas", anticipo: "Anticipos", rectificativa: "Rectificativas" };
 
 export type ClientSnapshot = { name: string; legalName: string | null; taxId: string | null; email: string | null; address: string | null };
@@ -102,7 +102,7 @@ export async function orderInvoiceLines(tx: Tx, orderId: string): Promise<{ line
       quantity: qty,
       unitPrice: qty !== 0 ? Math.round((p.gross / qty) * 10000) / 10000 : 0,
       discountPct: combined,
-      taxRate: Number(l.taxRate ?? 21),
+      taxRate: Number(l.taxRate ?? settings.vatRate),
     });
   }
   return { lines, order };
@@ -151,7 +151,7 @@ export async function createInvoiceFromOrder(tx: Tx, ctx: Ctx, input: { orderId:
 }
 
 export async function createBlankInvoice(tx: Tx, ctx: Ctx, input: { clientId: string | null; lines?: InvoiceLine[] }) {
-  const lines = input.lines ?? [{ description: "", quantity: 1, unitPrice: 0, discountPct: 0, taxRate: 21 }];
+  const lines = input.lines ?? [{ description: "", quantity: 1, unitPrice: 0, discountPct: 0, taxRate: (await pricingSettings(tx)).vatRate }];
   const totals = invoiceTotals(lines);
   const [inv] = await tx
     .insert(invoices)
@@ -168,13 +168,32 @@ async function draftOrThrow(tx: Tx, invoiceId: string) {
   return inv;
 }
 
-export async function updateDraftInvoice(tx: Tx, ctx: Ctx, input: { invoiceId: string; clientId: string | null; lines: InvoiceLine[]; notes: string | null; dueDate: string | null }) {
+export async function updateDraftInvoice(
+  tx: Tx,
+  ctx: Ctx,
+  input: { invoiceId: string; clientId: string | null; lines: InvoiceLine[]; notes: string | null; dueDate: string | null; seriesId?: string | null },
+) {
   const inv = await draftOrThrow(tx, input.invoiceId);
+  if (input.seriesId) {
+    const [s] = await tx.select({ kind: invoiceSeries.kind }).from(invoiceSeries).where(eq(invoiceSeries.id, input.seriesId));
+    if (!s) throw new UserError("Serie no encontrada");
+    if (s.kind !== inv.kind) throw new UserError("La serie elegida es de otro tipo de documento");
+  }
   const totals = invoiceTotals(input.lines);
   const snapshot = input.clientId !== inv.clientId || !inv.clientSnapshot ? await clientSnapshot(tx, input.clientId) : inv.clientSnapshot;
   await tx
     .update(invoices)
-    .set({ clientId: input.clientId, clientSnapshot: snapshot, lines: input.lines, subtotal: totals.subtotal, vat: totals.vat, total: totals.total, notes: input.notes, dueDate: input.dueDate })
+    .set({
+      clientId: input.clientId,
+      clientSnapshot: snapshot,
+      lines: input.lines,
+      subtotal: totals.subtotal,
+      vat: totals.vat,
+      total: totals.total,
+      notes: input.notes,
+      dueDate: input.dueDate,
+      ...(input.seriesId !== undefined ? { seriesId: input.seriesId } : {}),
+    })
     .where(eq(invoices.id, inv.id));
   await audit(tx, ctx, "invoice", inv.id, "editar", { total: { de: inv.total, a: totals.total } });
 }
@@ -185,16 +204,25 @@ export async function deleteDraftInvoice(tx: Tx, ctx: Ctx, invoiceId: string) {
   await audit(tx, ctx, "invoice", inv.id, "borrar");
 }
 
-/** Series for a kind and year, created on demand, locked FOR UPDATE. */
+/**
+ * Series for a kind and year, created on demand, locked FOR UPDATE. A draft may
+ * carry a chosen series (`seriesId`); if it belongs to another year, the same
+ * code is used for the issue year. Without one, the default F / A / R series.
+ */
 async function lockSeries(tx: Tx, kind: InvoiceKind, year: number, seriesId?: string | null) {
+  let code = SERIES_CODE[kind];
+  let name = SERIES_NAME[kind];
   if (seriesId) {
     const [s] = await tx.select().from(invoiceSeries).where(eq(invoiceSeries.id, seriesId)).for("update");
-    if (s && s.year === year) return s;
+    if (s && s.kind === kind) {
+      if (s.year === year) return s;
+      code = s.code;
+      name = s.name;
+    }
   }
-  const code = SERIES_CODE[kind];
   await tx
     .insert(invoiceSeries)
-    .values({ code, name: SERIES_NAME[kind], kind, year, nextNumber: 1 })
+    .values({ code, name, kind, year, nextNumber: 1 })
     .onConflictDoNothing();
   const [s] = await tx
     .select()

@@ -37,12 +37,13 @@ export function AddSearch({
   const options = useMemo<Option[]>(() => {
     const opts: Option[] = [];
     for (const f of catalogue.families) {
+      if (f.active === false) continue;
       const truss = f.trussItemId ? catalogue.items.find((i) => i.id === f.trussItemId) : null;
       opts.push({
         id: `f-${f.id}`,
         group: "Carpas",
         label: f.name,
-        hint: `${f.roofShape === "jaima" ? "5x5" : `${f.width} m · módulos de ${f.moduleLength} m`}${truss ? ` · ${truss.sku}` : ""}`,
+        hint: `${f.roofShape === "jaima" ? `${f.width}x${f.width} m` : `${f.width} m · módulos de ${f.moduleLength} m`}${truss ? ` · ${truss.sku}` : ""}`,
         icon: Tent,
         make: () => {
           const config = defaultConfiguration(f, f.roofShape === "jaima" ? 1 : 4);
@@ -66,7 +67,8 @@ export function AddSearch({
       opts.push({ id: `k-${k.id}`, group: "Kits", label: k.name, hint: `${k.items.length} artículos · ${formatEUR(k.price)}`, icon: Package, make: () => ({ key: newKey(), kind: "kit", kitId: k.id, description: k.name, quantity: 1, unitPrice: k.price, discountPct: 0 }) });
     }
     const weight = [...computed.boms.values()].reduce((s, b) => s + b.totals.weightKg, 0);
-    const trips = Math.max(1, ...[...computed.boms.values()].flatMap((b) => b.tents.map((t) => t.result.vehicles[0]?.count ?? 1)));
+    // "Viajes" in the order data wins; left at 1, the trips come from the vehicles the despiece needs
+    const trips = order.trips > 1 ? order.trips : Math.max(1, ...[...computed.boms.values()].flatMap((b) => b.tents.map((t) => t.result.vehicles[0]?.count ?? 1)));
     const hours = [...computed.boms.values()].reduce((s, b) => s + b.totals.montajeHoras + b.totals.desmontajeHoras, 0);
     if (order.distanceKm != null) {
       opts.push({ id: "s-transporte", group: "Servicios", label: `Transporte (${Math.round(order.distanceKm)} km, ${trips} viaje${trips > 1 ? "s" : ""})`, hint: weight ? `${formatNumber(weight / 1000)} t de material` : undefined, icon: Truck, make: () => ({ key: newKey(), ...transportLine(order.distanceKm!, trips, pricing), kind: "transporte", unitCost: transportLine(order.distanceKm!, trips, pricing).unitCost ?? 0 }) });

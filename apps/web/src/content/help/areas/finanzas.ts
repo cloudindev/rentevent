@@ -18,7 +18,7 @@ export const area: HelpArea = {
     { term: "Anulada", definition: "Factura anulada por una rectificativa emitida por el importe total." },
     { term: "Anticipo", definition: "Factura por un porcentaje del pedido. Se descuenta automáticamente en la factura final del mismo pedido." },
     { term: "Rectificativa", definition: "Factura de la serie R que corrige o anula una factura emitida, con importes en negativo." },
-    { term: "Serie", definition: "Numeración correlativa por año: F para facturas, A para anticipos y R para rectificativas." },
+    { term: "Serie", definition: "Numeración correlativa por año. Por defecto, F para facturas, A para anticipos y R para rectificativas; puedes crear series propias y elegirlas en el borrador." },
     { term: "Huella", definition: "Código del registro Verifactu de cada factura emitida, encadenado con la huella de la factura anterior." },
     { term: "Conciliar", definition: "Vincular un movimiento bancario con el cobro de una factura, el pago de una compra o una categoría." },
     { term: "Previsto", definition: "Movimiento con fecha futura que solo cuenta para la previsión de caja." },
@@ -133,10 +133,11 @@ export const area: HelpArea = {
         {
           title: "Elige cliente y vencimiento",
           text: "En la tarjeta **Borrador** elige el **Cliente**; la lista indica cuáles no tienen NIF. Deja **Vencimiento** vacío para usar las condiciones de pago del cliente.",
+          tip: "Si has creado series propias, aparece también **Serie**: elige con qué serie se numerará al emitir. Si no eliges ninguna se usa la predeterminada (F, A o R según el tipo).",
         },
         {
           title: "Añade las líneas",
-          text: "Rellena **Concepto**, **Cant.**, **Precio**, **Dto. %** e **IVA** (21, 10, 4 o 0 %). Usa **Añadir línea** para más y el icono de papelera para quitar una.",
+          text: "Rellena **Concepto**, **Cant.**, **Precio**, **Dto. %** e **IVA** (21, 10, 4 o 0 %, además del tipo general que tengas en Tarifas). Usa **Añadir línea** para más y el icono de papelera para quitar una.",
         },
         {
           title: "Añade notas",
@@ -217,7 +218,10 @@ export const area: HelpArea = {
           text: "El cobro aparece en la tarjeta **Cobros**. Cuando lo cobrado cubre el total, la factura pasa a **Cobrada**.",
         },
       ],
-      notes: ["Un cobro con importe negativo resta lo cobrado; úsalo para corregir un cobro apuntado por error mientras la factura tenga importe pendiente."],
+      notes: [
+        "Un cobro con importe negativo resta lo cobrado; úsalo para corregir un cobro apuntado por error.",
+        "Si la factura ya está **Cobrada**, el botón Registrar cobro desaparece: pulsa **Más acciones** y elige **Corregir cobro**. El importe propuesto es lo cobrado en negativo; ajústalo y pulsa **Registrar**. La factura vuelve a tener importe pendiente.",
+      ],
     },
     {
       slug: "enviar-y-descargar",
@@ -304,6 +308,11 @@ export const area: HelpArea = {
           title: "Crea una serie",
           text: "Pulsa **Nueva serie**, rellena **Código** (mayúsculas y números, hasta 6), **Año**, **Nombre** y **Tipo**, y pulsa **Crear serie**.",
         },
+        {
+          title: "Usa la serie en una factura",
+          text: "Abre un borrador del mismo tipo que la serie y elígela en **Serie**. Pulsa **Guardar borrador** y emite: el número sale de esa serie (por ejemplo B2026-0001).",
+          tip: "Si emites en un año distinto al de la serie, se usa el mismo código en la serie del año de emisión, que se crea si no existe.",
+        },
       ],
     },
     {
@@ -364,7 +373,10 @@ export const area: HelpArea = {
           text: "Escribe la **Base imponible**, elige el **IVA** y comprueba el **Total**. Pulsa **Guardar**.",
         },
       ],
-      notes: ["Usa el lápiz de cada fila para editar una compra. Solo se pueden borrar las compras pendientes, no las pagadas."],
+      notes: [
+        "Usa el lápiz de cada fila para editar una compra. Solo se pueden borrar las compras pendientes, no las pagadas.",
+        "En una compra pagada con un movimiento bancario conciliado no se puede cambiar el importe: primero pulsa **Deshacer conciliación** en ese movimiento en Tesorería (la compra vuelve a pendiente), corrige la compra y vuelve a pagarla o conciliarla.",
+      ],
     },
     {
       slug: "pagar-compra",
@@ -477,7 +489,7 @@ export const area: HelpArea = {
         {
           title: "Deshaz si te equivocas",
           text: "En un movimiento conciliado con una compra o una categoría pulsa **Deshacer conciliación**. La compra vuelve a quedar pendiente.",
-          tip: "Los movimientos vinculados a un cobro de factura no se desconcilian desde aquí: corrige el cobro con un cobro negativo desde la factura.",
+          tip: "Los movimientos vinculados a un cobro de factura no se desconcilian desde aquí: corrige el cobro con un cobro negativo desde la factura (en una factura cobrada, **Más acciones** > **Corregir cobro**).",
         },
       ],
       notes: ["Para borrar un movimiento conciliado, deshaz antes la conciliación. Los movimientos previstos se borran con su icono de papelera."],

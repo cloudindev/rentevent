@@ -11,7 +11,7 @@ export const area: HelpArea = {
     "Ninguna de las dos pantallas se edita directamente: los datos salen de Pedidos, Proyectos, Personal y Transporte. Si cambias las fechas de un pedido o de una fase, el Inicio y la Agenda se actualizan solos.",
   ],
   concepts: [
-    { term: "Montajes y desmontajes (48 h)", definition: "Número de fases de montaje y desmontaje de proyectos en Consulta, Opción, Confirmado o En curso entre hoy y pasado mañana." },
+    { term: "Montajes y desmontajes (48 h)", definition: "Número de fases de montaje y desmontaje de proyectos en Opción, Confirmado o En curso que caen entre hoy y mañana, incluidas las que empezaron antes y siguen en marcha." },
     { term: "Conflictos de material (30 d)", definition: "Pedidos en Opción, Confirmado o En curso de los próximos 30 días a los que les faltan unidades de algún artículo." },
     { term: "Turnos sin cubrir (14 d)", definition: "Turnos de los próximos 14 días con menos personas asignadas que las necesarias." },
     { term: "Pedidos pendientes", definition: "Pedidos en Borrador, Consulta u Opción, ordenados por fecha de carga." },
@@ -42,11 +42,11 @@ export const area: HelpArea = {
       path: "/app/inicio",
       steps: [
         { title: "Localiza la tarjeta", text: "En Inicio, la tarjeta **Hoy y mañana en obra** lista las fases de proyecto de tipo Carga, Montaje, Desmontaje y Retorno." },
-        { title: "Lee cada fila", text: "Cada fila indica **Hoy** o **Mañana** con la hora de inicio, el tipo de fase y el nombre del proyecto." },
+        { title: "Lee cada fila", text: "Cada fila indica **Hoy** o **Mañana** con la hora de inicio (o **En curso** si la fase empezó antes de hoy y sigue en marcha), el tipo de fase y el nombre del proyecto." },
         { title: "Abre el proyecto", text: "Pulsa el nombre del proyecto para ir a su ficha, donde ves el cronograma completo y el personal asignado." },
         { title: "Pasa a la agenda del día", text: "Pulsa **Agenda** en la cabecera de la tarjeta para ver el día con todos los pedidos, turnos y transportes." },
       ],
-      notes: ["Solo aparecen fases de proyectos en estado Consulta, Opción, Confirmado o En curso. Los proyectos cancelados o devueltos no se muestran."],
+      notes: ["Solo aparecen fases de proyectos en estado Opción, Confirmado o En curso. Los proyectos en consulta, cancelados o devueltos no se muestran."],
     },
     {
       slug: "resolver-conflictos-de-material",
@@ -71,8 +71,8 @@ export const area: HelpArea = {
       path: "/app/inicio",
       steps: [
         { title: "Pedidos pendientes", text: "La tarjeta **Pedidos pendientes** muestra hasta 8 pedidos en Borrador, Consulta u Opción con su estado. Pulsa uno para abrirlo o **Todos** para ir al listado de Pedidos." },
-        { title: "Opciones a punto de caducar", text: "Si alguna opción caduca en menos de 3 días aparece un aviso amarillo encima de la lista.", tip: "Cuando una opción caduca, el pedido vuelve solo a Consulta y deja de reservar material. Confírmalo o renueva la opción antes." },
-        { title: "Presupuestos sin respuesta", text: "Debajo verás cuántos presupuestos están en estado enviado sin que el cliente los haya aceptado." },
+        { title: "Opciones a punto de caducar", text: "Si alguna opción caduca en menos de 3 días aparece un aviso amarillo encima de la lista. Cuenta todos los pedidos en Opción, no solo los que se ven en la lista.", tip: "Cuando una opción caduca, el pedido vuelve solo a Consulta y deja de reservar material. Confírmalo o renueva la opción antes." },
+        { title: "Presupuestos sin respuesta", text: "Debajo verás cuántos presupuestos están en estado Enviado sin que el cliente los haya aceptado. Solo cuenta la última versión de cada pedido abierto." },
         { title: "Personal sin cubrir", text: "La tarjeta **Personal sin cubrir** lista hasta 8 turnos con personas asignadas sobre necesarias (por ejemplo 2/4) y la fecha. Pulsa **Tablero** para asignar gente." },
         { title: "Resumen de finanzas", text: "Si tienes acceso a finanzas verás **Facturado este mes** con el número de facturas y **Vencido sin cobrar**, que aparece en rojo cuando es mayor que cero." },
       ],

@@ -14,6 +14,7 @@ import { Switch } from "@/components/ui/menu";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { cn, formatDate, formatNumber, formatTime } from "@/lib/utils";
 import { assignVehicle, saveVehicle } from "@/server/actions/transport";
+import { canDrive } from "@/server/transport/logic";
 import { shiftKey } from "@/server/crew/board";
 import { nowMs } from "@/server/crew/hours";
 
@@ -39,12 +40,11 @@ type Trip = {
 const KIND_LABEL: Record<string, string> = { camion: "Camión", furgoneta: "Furgoneta", trailer: "Tráiler", remolque: "Remolque", grua: "Camión grúa" };
 const EMPTY: Vehicle = { name: "", plate: "", kind: "camion", maxPayloadKg: 6000, volumeM3: 30, licenceRequired: "conductor_c", itvUntil: "", costPerKm: 0.9, active: true };
 
-export function TransportView({ day, tab, fleet, trips, canEdit }: { day: string; tab: "rutas" | "vehiculos"; fleet: (Vehicle & { id: string })[]; trips: Trip[]; canEdit: boolean }) {
+export function TransportView({ day, today, tab, fleet, trips, canEdit }: { day: string; today: string; tab: "rutas" | "vehiculos"; fleet: (Vehicle & { id: string })[]; trips: Trip[]; canEdit: boolean }) {
   const router = useRouter();
   const [editing, setEditing] = useState<Vehicle | null>(null);
   const [busy, start] = useTransition();
   const go = (p: Record<string, string>) => router.push(`/app/transporte?${new URLSearchParams({ fecha: day, tab, ...p })}`);
-  const today = new Date().toISOString().slice(0, 10);
 
   return (
     <div className="space-y-4">
@@ -94,7 +94,7 @@ export function TransportView({ day, tab, fleet, trips, canEdit }: { day: string
               const v = fleet.find((x) => x.id === t.vehicleId);
               const overW = v && t.load ? t.load.weightKg > v.maxPayloadKg : false;
               const overV = v && t.load ? t.load.volumeM3 > v.volumeM3 : false;
-              const driver = v ? t.crew.find((c) => c.skills.includes(v.licenceRequired) || (v.licenceRequired === "conductor_c" && c.skills.includes("conductor_ce"))) : null;
+              const driver = v ? t.crew.find((c) => canDrive(c.skills, v.licenceRequired)) : null;
               return (
                 <li key={t.id} className="rounded-xl border bg-card p-4">
                   <div className="flex flex-wrap items-start gap-3">

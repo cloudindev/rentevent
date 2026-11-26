@@ -4,7 +4,7 @@ import { eq, orders, quotes, withTenant } from "@rentevent/db";
 import { normalizeSnapshot } from "@/server/pdf/quote";
 import { compositionSchema } from "@rentevent/core";
 import { loadCatalog } from "@/server/catalog";
-import { findQuoteByToken } from "@/server/public-quote";
+import { findQuoteByToken, quoteBlock } from "@/server/public-quote";
 import { formatEUR, formatRange, initials } from "@/lib/utils";
 import { PublicQuoteClient } from "./client";
 
@@ -19,7 +19,8 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
     const [row] = await tx.select().from(quotes).where(eq(quotes.id, q.id));
     if (row && !row.viewedAt) await tx.update(quotes).set({ viewedAt: new Date() }).where(eq(quotes.id, q.id));
     const [order] = await tx.select().from(orders).where(eq(orders.id, row!.orderId));
-    return { row: row!, order, cat: await loadCatalog(tx, { includeInactive: true }) };
+    const blocked = row!.status === "aceptado" || !order ? null : await quoteBlock(tx, row!, order.status);
+    return { row: row!, order, blocked, cat: await loadCatalog(tx, { includeInactive: true }) };
   });
   const snap = normalizeSnapshot(d.row.snapshot, d.order);
   const comps = snap.tents.map((t) => compositionSchema.safeParse(t.composition)).filter((r) => r.success).map((r) => r.data!);
@@ -47,6 +48,7 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
           rules={d.cat.rules}
           accepted={d.row.status === "aceptado"}
           signer={d.row.signatureName}
+          blocked={d.blocked}
           expired={Boolean(d.row.validUntil && d.row.validUntil < new Date().toISOString().slice(0, 10))}
         />
         <section className="overflow-hidden rounded-xl border bg-card">

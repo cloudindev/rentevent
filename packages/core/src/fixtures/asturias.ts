@@ -45,7 +45,7 @@ const HW = {
   tensor: add({ id: "item-tensor", sku: "TEN", name: "Tensor de arriostramiento", unit: "ud", weightKg: 4, volumeM3: 0.005, role: "tensor", category: "Estructura", stock: 400, kind: "granel", price: 0, priceMode: "incluido", ...P }),
   peso: add({ id: "item-peso-500", sku: "PES-500", name: "Peso de hormigón 500 kg", unit: "ud", weightKg: 500, volumeM3: 0.21, role: "peso", category: "Lastre", stock: 400, kind: "granel", price: 6, priceMode: "unidad", ...P }),
   estaca: add({ id: "item-estaca", sku: "EST", name: "Estaca de anclaje", unit: "ud", weightKg: 3, volumeM3: 0.002, role: "estaca", category: "Anclaje", stock: 2000, kind: "granel", price: 0, priceMode: "incluido", ...P }),
-  canalon: add({ id: "item-canalon", sku: "CAN-5", name: "Canalón de unión 5 m", unit: "ud", weightKg: 18, volumeM3: 0.04, role: "canalon", category: "Accesorios", stock: 60, kind: "granel", price: 25, priceMode: "unidad", ...P }),
+  canalon: add({ id: "item-canalon", sku: "CAN-5", name: "Canalón de unión 5 m", unit: "ud", weightKg: 18, volumeM3: 0.04, role: "canalon", category: "Accesorios", stock: 60, kind: "granel", price: 25, priceMode: "unidad", roleAmount: 5, ...P }),
 };
 
 const sides = {

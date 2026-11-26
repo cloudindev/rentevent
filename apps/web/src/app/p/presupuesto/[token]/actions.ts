@@ -3,7 +3,8 @@ import { headers } from "next/headers";
 import { z } from "zod";
 import { eq, orders, quotes, withTenant } from "@rentevent/db";
 import { AvailabilityConflictError, reserveOrder } from "@rentevent/db/services";
-import { findQuoteByToken } from "@/server/public-quote";
+import { findQuoteByToken, quoteBlock } from "@/server/public-quote";
+import { syncProjectStatus } from "@/server/orders";
 import { audit } from "@/server/audit";
 import { emitEvent } from "@/server/events";
 
@@ -20,20 +21,28 @@ export async function acceptQuote(raw: z.input<typeof input>): Promise<{ ok: boo
     const [row] = await tx.select().from(quotes).where(eq(quotes.id, q.id)).for("update");
     if (!row) return { ok: false, error: "Presupuesto no encontrado" };
     if (row.status === "aceptado") return { ok: true, confirmed: true };
+    const [order] = await tx.select().from(orders).where(eq(orders.id, row.orderId)).for("update");
+    if (!order) return { ok: false, error: "Presupuesto no encontrado" };
+    const blocked = await quoteBlock(tx, row, order.status);
+    if (blocked) return { ok: false, error: blocked };
     if (row.validUntil && row.validUntil < new Date().toISOString().slice(0, 10)) return { ok: false, error: "El presupuesto ha caducado. Pide uno actualizado." };
     await tx.update(quotes).set({ status: "aceptado", acceptedAt: new Date(), signatureName: parsed.data.name, signatureImage: parsed.data.signature, signatureIp: ip }).where(eq(quotes.id, q.id));
-    // other versions of the same order are superseded
     await audit(tx, null, "quote", q.id, "aceptar", { firmante: parsed.data.name, ip });
-    let confirmed = false;
-    try {
-      await reserveOrder(tx, row.orderId, "confirmado", { userId: null });
-      confirmed = true;
-    } catch (e) {
-      if (!(e instanceof AvailabilityConflictError)) throw e;
-      await tx.update(orders).set({ notes: `Aceptado por el cliente el ${new Date().toLocaleString("es-ES", { timeZone: "Europe/Madrid" })}, pero falta material: revisar antes de confirmar.` }).where(eq(orders.id, row.orderId));
+    // an order that is already confirmed or on site keeps its status (and its reservations)
+    let confirmed = order.status === "confirmado" || order.status === "en_curso";
+    if (!confirmed) {
+      try {
+        await reserveOrder(tx, row.orderId, "confirmado", { userId: null });
+        confirmed = true;
+      } catch (e) {
+        if (!(e instanceof AvailabilityConflictError)) throw e;
+        const note = `Aceptado por el cliente el ${new Date().toLocaleString("es-ES", { timeZone: "Europe/Madrid" })}, pero falta material: revisar antes de confirmar.`;
+        await tx.update(orders).set({ notes: order.notes?.trim() ? `${order.notes.trim()}\n\n${note}` : note }).where(eq(orders.id, row.orderId));
+      }
+      await syncProjectStatus(tx, order.projectId);
     }
     emitEvent(q.tenantId, "quote.accepted", { id: q.id, orderId: row.orderId, signer: parsed.data.name, confirmed });
-    if (confirmed) emitEvent(q.tenantId, "order.confirmed", { id: row.orderId, via: "aceptacion_cliente" });
+    if (confirmed && order.status !== "confirmado" && order.status !== "en_curso") emitEvent(q.tenantId, "order.confirmed", { id: row.orderId, via: "aceptacion_cliente" });
     return { ok: true, confirmed };
   });
 }

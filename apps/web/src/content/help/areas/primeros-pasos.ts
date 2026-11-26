@@ -50,7 +50,7 @@ export const area: HelpArea = {
         {
           title: "Confirma el correo",
           text: "Abre el correo **Confirma tu correo en Rentevent** y pulsa **Confirmar correo**. Entrarás directamente al asistente de configuración.",
-          tip: "No podrás iniciar sesión hasta que confirmes el correo. Si no lo ves, revisa la carpeta de spam.",
+          tip: "No podrás iniciar sesión hasta que confirmes el correo. Si no lo ves, revisa la carpeta de spam, o intenta iniciar sesión y pulsa **Reenviar el enlace**.",
         },
       ],
       notes: ["Si ya existe una cuenta con ese correo, el formulario te lo indicará: en ese caso inicia sesión y crea una empresa nueva desde Espacios de trabajo."],
@@ -128,7 +128,7 @@ export const area: HelpArea = {
       steps: [
         {
           title: "Abre la página de acceso",
-          text: "Ve a la página **Bienvenido de nuevo**. Si entras por el subdominio de tu empresa verás **Entrar en** seguido del nombre y el logotipo de tu empresa; el formulario es el mismo.",
+          text: "Ve a la página **Bienvenido de nuevo**. Si entras por el subdominio de tu empresa verás **Entrar en** seguido del nombre, el logotipo y el color de marca de tu empresa; el formulario es el mismo.",
         },
         {
           title: "Escribe tus credenciales",
@@ -150,7 +150,7 @@ export const area: HelpArea = {
       ],
       notes: [
         "Equivocarte con la contraseña no bloquea la cuenta: puedes volver a intentarlo enseguida o pulsar **¿Has olvidado la contraseña?**.",
-        "Si el correo aún no está confirmado, verás el aviso para confirmarlo antes de entrar.",
+        "Si el correo aún no está confirmado, verás el aviso para confirmarlo antes de entrar. Si no encuentras el correo de confirmación, pulsa **Reenviar el enlace** en ese mismo aviso.",
         "Los usuarios con rol Montador entran directamente en la app móvil de campo en lugar del back office.",
       ],
     },

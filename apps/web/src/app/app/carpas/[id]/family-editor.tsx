@@ -20,7 +20,7 @@ import {
   type VehicleType,
 } from "@rentevent/core";
 import type { CatalogFamily, CatalogItem } from "@/server/catalog";
-import { duplicateFamily, deleteFamily, saveFamily, saveRules } from "@/server/actions/tents";
+import { duplicateFamily, deleteFamily, reactivateFamily, saveFamily, saveRules } from "@/server/actions/tents";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Field, Input, NativeSelect } from "@/components/ui/input";
@@ -99,7 +99,10 @@ export function FamilyEditor({ family, rules, items, vehicles, canEdit }: { fami
               <CardTitle>Geometría y tarifa</CardTitle>
               <CardDescription>El largo se compone de módulos; pórticos = módulos + 1.</CardDescription>
             </div>
-            {f.parametersPending ? <StatusPill tone="warning">Pendiente validar</StatusPill> : <StatusPill tone="success">Validada</StatusPill>}
+            <div className="flex gap-1.5">
+              {!family.active && <StatusPill tone="neutral">Inactiva</StatusPill>}
+              {f.parametersPending ? <StatusPill tone="warning">Pendiente validar</StatusPill> : <StatusPill tone="success">Validada</StatusPill>}
+            </div>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Field label="Código" htmlFor="code">
@@ -234,20 +237,23 @@ export function FamilyEditor({ family, rules, items, vehicles, canEdit }: { fami
               const v = validation[i]!;
               return (
                 <div key={d.key} className="grid gap-2 rounded-lg border p-2 md:grid-cols-[minmax(0,2fr)_110px_minmax(0,1.4fr)_minmax(0,1.2fr)_84px] md:border-0 md:p-0">
-                  <NativeSelect aria-label="Artículo" value={d.itemId} disabled={!canEdit} onChange={(e) => setRule(i, { itemId: e.target.value })} aria-invalid={!d.itemId}>
-                    <option value="">Elige artículo…</option>
-                    {categories.map((c) => (
-                      <optgroup key={c} label={c}>
-                        {items
-                          .filter((it) => it.category === c)
-                          .map((it) => (
-                            <option key={it.id} value={it.id}>
-                              {it.name}
-                            </option>
-                          ))}
-                      </optgroup>
-                    ))}
-                  </NativeSelect>
+                  <div className="space-y-1">
+                    <NativeSelect aria-label="Artículo" value={d.itemId} disabled={!canEdit} onChange={(e) => setRule(i, { itemId: e.target.value })} aria-invalid={!d.itemId}>
+                      <option value="">Elige artículo…</option>
+                      {categories.map((c) => (
+                        <optgroup key={c} label={c}>
+                          {items
+                            .filter((it) => it.category === c)
+                            .map((it) => (
+                              <option key={it.id} value={it.id}>
+                                {it.name}
+                              </option>
+                            ))}
+                        </optgroup>
+                      ))}
+                    </NativeSelect>
+                    <Input aria-label="Nota" placeholder="Nota (opcional)" maxLength={200} value={d.note} disabled={!canEdit} className="h-7 text-xs" onChange={(e) => setRule(i, { note: e.target.value })} />
+                  </div>
                   <NativeSelect aria-label="Grupo" value={d.group} disabled={!canEdit} onChange={(e) => setRule(i, { group: e.target.value as BomGroup })}>
                     {BOM_GROUPS.map((g) => (
                       <option key={g} value={g}>
@@ -311,19 +317,40 @@ export function FamilyEditor({ family, rules, items, vehicles, canEdit }: { fami
             >
               <Copy /> Duplicar
             </Button>
-            <Button
-              variant="ghost"
-              className="text-danger"
-              onClick={() =>
-                confirm("¿Desactivar esta familia? Los pedidos existentes no cambian.") &&
-                start(async () => {
-                  const r = await deleteFamily({ id: f.id });
-                  if (r.ok) router.push("/app/carpas");
-                })
-              }
-            >
-              Desactivar
-            </Button>
+            {family.active ? (
+              <Button
+                variant="ghost"
+                className="text-danger"
+                disabled={pending}
+                onClick={() =>
+                  confirm("¿Desactivar esta familia? Deja de ofrecerse en pedidos nuevos; los pedidos existentes no cambian.") &&
+                  start(async () => {
+                    const r = await deleteFamily({ id: f.id });
+                    if (!r.ok) { toast.error(r.error); return; }
+                    toast.success("Familia desactivada");
+                    router.push("/app/carpas");
+                  })
+                }
+              >
+                Desactivar
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                disabled={pending}
+                onClick={() =>
+                  start(async () => {
+                    const r = await reactivateFamily({ id: f.id });
+                    if (!r.ok) { toast.error(r.error); return; }
+                    setF((x) => ({ ...x, active: true }));
+                    toast.success("Familia reactivada");
+                    router.refresh();
+                  })
+                }
+              >
+                Reactivar
+              </Button>
+            )}
           </div>
         )}
       </div>

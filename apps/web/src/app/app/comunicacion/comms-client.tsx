@@ -49,7 +49,7 @@ export function AnnouncementActions({ a }: { a: Ann & { id: string } }) {
   return (
     <div className="flex shrink-0 gap-1">
       <Button size="icon-sm" variant="ghost" aria-label="Editar aviso" onClick={() => setOpen(true)}><Pencil /></Button>
-      <Button size="icon-sm" variant="ghost" aria-label="Eliminar aviso" disabled={pending} onClick={() => confirm("¿Eliminar el aviso?") && start(async () => { await deleteAnnouncement({ id: a.id }); router.refresh(); })}><Trash2 /></Button>
+      <Button size="icon-sm" variant="ghost" aria-label="Eliminar aviso" disabled={pending} onClick={() => confirm("¿Eliminar el aviso?") && start(async () => { const r = await deleteAnnouncement({ id: a.id }); if (!r.ok) { toast.error(r.error); return; } router.refresh(); })}><Trash2 /></Button>
       {open && <AnnouncementDialog open={open} onOpenChange={setOpen} initial={a} />}
     </div>
   );

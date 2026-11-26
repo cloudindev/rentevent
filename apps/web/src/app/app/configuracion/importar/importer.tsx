@@ -1,6 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { FileSpreadsheet, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { StatusPill } from "@/components/ui/badge";
@@ -30,18 +30,21 @@ export function Importer({ allowed, onDone, compact }: { allowed: Record<Entity,
   const [mapping, setMapping] = useState<Record<string, string | null>>({});
   const [result, setResult] = useState<Result | null>(null);
   const [busy, setBusy] = useState(false);
+  const seq = useRef(0);
 
-  async function call(mode: "preview" | "dryrun" | "import", f = file, m: Record<string, string | null> | null = mapping) {
+  async function call(mode: "preview" | "dryrun" | "import", f = file, m: Record<string, string | null> | null = mapping, ent: Entity = entity) {
     if (!f) return;
+    const id = ++seq.current;
     setBusy(true);
     const fd = new FormData();
     fd.append("file", f);
-    fd.append("entity", entity);
+    fd.append("entity", ent);
     fd.append("mode", mode);
     if (m && mode !== "preview") fd.append("mapping", JSON.stringify(m));
     if (m && mode === "preview" && Object.keys(m).length) fd.append("mapping", JSON.stringify(m));
     const res = await fetch("/app/configuracion/importar/api", { method: "POST", body: fd });
     const j = await res.json();
+    if (id !== seq.current) return; // a newer request (other file or type) superseded this one
     setBusy(false);
     if (!res.ok) {
       toast.error(j.error ?? "Error al importar");
@@ -73,7 +76,15 @@ export function Importer({ allowed, onDone, compact }: { allowed: Record<Entity,
         <CardContent className="space-y-4">
           <div className={cn("grid gap-2", !compact && "sm:grid-cols-3")}>
             {ENTITIES.filter((e) => allowed[e.id]).map((e) => (
-              <button key={e.id} type="button" onClick={() => { setEntity(e.id); setPreview(null); setResult(null); setMapping({}); }} className={cn("rounded-xl border p-3 text-left text-sm hover:bg-subtle", entity === e.id && "border-brand-400 bg-brand-50 dark:bg-brand-950")}>
+              <button key={e.id} type="button" onClick={() => {
+                if (e.id === entity) return;
+                setEntity(e.id);
+                setPreview(null);
+                setResult(null);
+                setMapping({});
+                // keep the chosen file: re-read it for the new type instead of making the user pick it again
+                if (file) void call("preview", file, null, e.id);
+              }} className={cn("rounded-xl border p-3 text-left text-sm hover:bg-subtle", entity === e.id && "border-brand-400 bg-brand-50 dark:bg-brand-950")}>
                 <span className="block font-medium">{e.label}</span>
                 <span className="block text-xs text-muted-foreground">{e.hint}</span>
               </button>
@@ -89,8 +100,12 @@ export function Importer({ allowed, onDone, compact }: { allowed: Record<Entity,
               className="sr-only"
               onChange={(e) => {
                 const f = e.target.files?.[0] ?? null;
+                // clear the input so picking the same file again still fires onChange
+                e.target.value = "";
                 setFile(f);
                 setMapping({});
+                setPreview(null);
+                setResult(null);
                 if (f) void call("preview", f, null);
               }}
             />

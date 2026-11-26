@@ -9,7 +9,7 @@ import { Field, Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/menu";
 import { acceptQuote } from "./actions";
 
-export function PublicQuoteClient({ token, composition, families, items, rules, accepted, signer, expired }: { token: string; composition: Composition | null; families: StructureFamily[]; items: BomItem[]; rules: BomRule[]; accepted: boolean; signer: string | null; expired: boolean }) {
+export function PublicQuoteClient({ token, composition, families, items, rules, accepted, signer, expired, blocked }: { token: string; composition: Composition | null; families: StructureFamily[]; items: BomItem[]; rules: BomRule[]; accepted: boolean; signer: string | null; expired: boolean; blocked: string | null }) {
   const [name, setName] = useState("");
   const [sig, setSig] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
@@ -32,6 +32,8 @@ export function PublicQuoteClient({ token, composition, families, items, rules, 
             <h2 className="text-lg font-semibold">Presupuesto aceptado</h2>
             <p className="text-sm text-muted-foreground">{signer ? `Firmado por ${signer}. ` : ""}{done.confirmed ? "Tu reserva queda confirmada. Te contactaremos para coordinar el montaje." : "Hemos recibido tu aceptación; el equipo revisará la disponibilidad y te confirmará la reserva."}</p>
           </div>
+        ) : blocked ? (
+          <p className="text-sm text-muted-foreground">{blocked}</p>
         ) : expired ? (
           <p className="text-sm text-muted-foreground">Este presupuesto ha caducado. Pide una versión actualizada.</p>
         ) : (

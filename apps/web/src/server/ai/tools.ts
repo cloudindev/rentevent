@@ -3,6 +3,7 @@ import { z } from "zod";
 import { addDays, dayKey, describeMaxLengths, maxLengthByFamily, parseDayKey, resizeConfiguration, zonedTime, type Anchoring } from "@rentevent/core";
 import { and, asc, assignments, contacts, eq, gte, inArray, invoices, lt, ne, orders, shifts, withTenant, workerUnavailability, workers } from "@rentevent/db";
 import { availableMap } from "@rentevent/db/services";
+import { can, type Permission } from "@/lib/permissions";
 import { formatEUR } from "@/lib/utils";
 import type { AppContext } from "../context";
 import { loadCatalog } from "../catalog";
@@ -84,6 +85,18 @@ export const TOOL_DEFINITIONS: { name: ToolName; description: string; input_sche
   },
 ];
 
+/** Extra permission a tool needs on top of access to the assistant. */
+const TOOL_PERMISSIONS: Partial<Record<ToolName, { permission: Permission; denied: string }>> = {
+  resumen_facturacion: { permission: "finanzas", denied: "No tienes permiso para consultar la facturación. Pídeselo a un administrador." },
+  crear_borrador_pedido: { permission: "comercial", denied: "No tienes permiso para crear pedidos." },
+};
+
+/** Tool definitions this user may call (the model never sees the ones they can't use). */
+export const toolDefinitionsFor = (role: string) => TOOL_DEFINITIONS.filter((t) => {
+  const req = TOOL_PERMISSIONS[t.name];
+  return !req || can(role, req.permission);
+});
+
 const STATUS: Record<string, string> = { borrador: "borrador", consulta: "consulta", opcion: "opción", confirmado: "confirmado", en_curso: "en curso", devuelto: "devuelto", cancelado: "cancelado" };
 
 export async function runTool(ctx: AppContext, name: string, rawInput: unknown): Promise<ToolResult> {
@@ -92,6 +105,8 @@ export async function runTool(ctx: AppContext, name: string, rawInput: unknown):
   const parsed = schema.safeParse(rawInput);
   if (!parsed.success) throw new Error(`Parámetros no válidos para ${name}: ${parsed.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}`);
   const input = parsed.data as never;
+  const req = TOOL_PERMISSIONS[name as ToolName];
+  if (req && !can(ctx.role, req.permission)) return { text: req.denied };
   switch (name as ToolName) {
     case "consultar_disponibilidad":
       return availability(ctx, input);

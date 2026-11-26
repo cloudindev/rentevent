@@ -15,7 +15,6 @@ import {
   subrentals,
   tentTemplates,
   venues,
-  type Tx,
 } from "@rentevent/db";
 import { AvailabilityConflictError, availableMap, checkOrderAvailability, reserveOrder, syncReservations } from "@rentevent/db/services";
 import { addDays, compositionSchema, dayKey, defaultConfiguration, quoteTotals, shortagesFor } from "@rentevent/core";
@@ -23,7 +22,9 @@ import { materialOf, orderTotals, tentLabel, type WorkLine } from "@/lib/order-m
 import { audit } from "../audit";
 import { tenantAction, UserError } from "../action";
 import { nextCounter } from "../numbering";
-import { loadCatalogue, tenantPricing } from "../orders";
+import { loadCatalogue, syncProjectStatus, tenantPricing } from "../orders";
+import { phaseTimes, rederivePhases } from "@/lib/order-phases";
+import { can } from "@/lib/permissions";
 import { persistLines } from "../order-persist";
 import { emitEvent } from "../events";
 import { buildTimeline } from "../timeline";
@@ -39,30 +40,6 @@ const workLine = z.discriminatedUnion("kind", [
   z.object({ key: z.string(), kind: z.literal("kit"), kitId: z.string().uuid(), description: z.string().max(200), quantity: z.number().min(0).max(1e5), unitPrice: z.number().min(0), discountPct: z.number().min(0).max(100) }),
   z.object({ key: z.string(), kind: z.enum(["servicio", "transporte", "mano_obra", "texto"]), description: z.string().max(500), quantity: z.number().min(0).max(1e6), unitPrice: z.number().min(-1e7).max(1e7), priceMode, discountPct: z.number().min(0).max(100), unitCost: z.number().min(0) }),
 ]);
-
-function phaseTimes(load: Date, eventStart: Date, eventEnd: Date, ret: Date) {
-  const H = 3_600_000;
-  const t = (d: Date, h: number) => new Date(d.getTime() + h * H);
-  const montajeEnd = new Date(Math.max(t(load, 6).getTime(), eventStart.getTime() - 2 * H));
-  return [
-    ["carga", load, t(load, 2)],
-    ["transporte", t(load, 2), t(load, 4)],
-    ["montaje", t(load, 4), montajeEnd > t(load, 4) ? montajeEnd : t(load, 10)],
-    ["evento", eventStart, eventEnd],
-    ["desmontaje", t(eventEnd, 2), new Date(Math.max(t(eventEnd, 6).getTime(), ret.getTime() - 3 * H))],
-    ["retorno", new Date(ret.getTime() - 3 * H), ret],
-  ] as const;
-}
-
-async function syncProjectStatus(tx: Tx, projectId: string) {
-  const os = await tx.select({ status: orders.status, start: orders.periodStart, end: orders.periodEnd }).from(orders).where(eq(orders.projectId, projectId));
-  const rank = ["cancelado", "borrador", "consulta", "devuelto", "opcion", "confirmado", "en_curso"];
-  const top = os.map((o) => o.status).sort((a, b) => rank.indexOf(b) - rank.indexOf(a))[0] ?? "consulta";
-  const status = top === "borrador" ? "consulta" : top;
-  const start = os.length ? new Date(Math.min(...os.map((o) => o.start.getTime()))) : null;
-  const end = os.length ? new Date(Math.max(...os.map((o) => o.end.getTime()))) : null;
-  await tx.update(projects).set({ status, startsAt: start, endsAt: end }).where(eq(projects.id, projectId));
-}
 
 const createInput = z
   .object({
@@ -87,15 +64,26 @@ export const createOrder = tenantAction(createInput, "comercial", async (input, 
     clientId = c!.id;
   }
   let projectId = input.projectId;
+  // the venue belongs to the project: an existing project keeps its own, and only takes the chosen one if it has none
+  let venueId = input.venueId;
+  if (projectId) {
+    const [p] = await tx.select({ venueId: projects.venueId }).from(projects).where(eq(projects.id, projectId));
+    if (!p) throw new UserError("Proyecto no encontrado");
+    if (p.venueId) venueId = p.venueId;
+    else if (venueId) {
+      const [v] = await tx.select().from(venues).where(eq(venues.id, venueId));
+      if (v) await tx.update(projects).set({ venueId, lat: v.lat, lng: v.lng, locationAddress: v.address, distanceKm: null }).where(eq(projects.id, projectId));
+    }
+  }
+  const [venue] = venueId ? await tx.select().from(venues).where(eq(venues.id, venueId)) : [undefined];
   if (!projectId) {
     const n = await nextCounter(tx, "proyecto");
-    const [v] = input.venueId ? await tx.select().from(venues).where(eq(venues.id, input.venueId)) : [undefined];
     const [p] = await tx
       .insert(projects)
-      .values({ number: `P-${new Date().getFullYear()}-${String(n).padStart(3, "0")}`, name: input.title, clientId, venueId: input.venueId, lat: v?.lat ?? null, lng: v?.lng ?? null, locationAddress: v?.address ?? null, status: "consulta", startsAt: input.loadAt, endsAt: input.returnAt, managerId: ctx.user.id })
+      .values({ number: `P-${new Date().getFullYear()}-${String(n).padStart(3, "0")}`, name: input.title, clientId, venueId: venue?.id ?? null, lat: venue?.lat ?? null, lng: venue?.lng ?? null, locationAddress: venue?.address ?? null, status: "consulta", startsAt: input.loadAt, endsAt: input.returnAt, managerId: ctx.user.id })
       .returning({ id: projects.id });
     projectId = p!.id;
-    for (const [kind, a, b] of phaseTimes(input.loadAt, input.eventStart, input.eventEnd, input.returnAt)) await tx.insert(projectPhases).values({ projectId, kind, startsAt: a, endsAt: b });
+    for (const [kind, a, b] of phaseTimes({ load: input.loadAt, eventStart: input.eventStart, eventEnd: input.eventEnd, ret: input.returnAt })) await tx.insert(projectPhases).values({ projectId, kind, startsAt: a, endsAt: b });
   }
   const number = String(await nextCounter(tx, "pedido"));
   const [client] = clientId ? await tx.select().from(contacts).where(eq(contacts.id, clientId)) : [undefined];
@@ -115,6 +103,8 @@ export const createOrder = tenantAction(createInput, "comercial", async (input, 
     const fam = cat.families.find((f) => f.id === input.familyId);
     if (fam) composition = { version: 1 as const, tents: [{ id: "t1", label: "", config: defaultConfiguration(fam, 4), placement: { x: 0, y: 0, rotation: 0 } }], gutters: [], site: null };
   }
+  // same rule as adding a tent from the order: no ground anchoring where the venue forbids it
+  if (composition && venue && !venue.anchoringAllowed) composition = { ...composition, tents: composition.tents.map((t) => ({ ...t, config: { ...t.config, anchoring: "pesos" as const } })) };
   if (composition) await persistLines(tx, o!.id, [{ key: "new", kind: "carpa", tentConfigId: null, label: "", composition, unitPrice: null, discountPct: 0 }]);
   await audit(tx, ctx, "order", o!.id, "crear", { numero: number });
   await syncProjectStatus(tx, projectId);
@@ -165,6 +155,7 @@ const headerInput = z
 export const updateOrderHeader = tenantAction(headerInput, "comercial", async (input, tx, ctx) => {
   const [o] = await tx.select().from(orders).where(eq(orders.id, input.orderId)).for("update");
   if (!o) throw new UserError("Pedido no encontrado");
+  if (["devuelto", "cancelado"].includes(o.status)) throw new UserError("El pedido está cerrado: reábrelo para editarlo.");
   await tx
     .update(orders)
     .set({ title: input.title, clientId: input.clientId, periodStart: input.periodStart, periodEnd: input.periodEnd, eventStart: input.eventStart, eventEnd: input.eventEnd, discountPct: input.discountPct, holiday: input.holiday, trips: input.trips, notes: input.notes })
@@ -172,9 +163,15 @@ export const updateOrderHeader = tenantAction(headerInput, "comercial", async (i
   const v = input.venueId ? (await tx.select().from(venues).where(eq(venues.id, input.venueId)))[0] : undefined;
   await tx.update(projects).set({ venueId: input.venueId, clientId: input.clientId ?? undefined, distanceKm: input.distanceKm, lat: v?.lat ?? undefined, lng: v?.lng ?? undefined, locationAddress: v?.address ?? undefined }).where(eq(projects.id, o.projectId));
   const datesChanged = o.periodStart.getTime() !== input.periodStart.getTime() || o.periodEnd.getTime() !== input.periodEnd.getTime();
+  const eventChanged = (o.eventStart?.getTime() ?? null) !== input.eventStart.getTime() || (o.eventEnd?.getTime() ?? null) !== input.eventEnd.getTime();
+  if (datesChanged || eventChanged) {
+    // move only the phases generated from this order's previous dates; manual edits and other orders' phases stay
+    const phases = await tx.select().from(projectPhases).where(eq(projectPhases.projectId, o.projectId));
+    const before = { load: o.periodStart, eventStart: o.eventStart ?? o.periodStart, eventEnd: o.eventEnd ?? o.periodEnd, ret: o.periodEnd };
+    const after = { load: input.periodStart, eventStart: input.eventStart, eventEnd: input.eventEnd, ret: input.periodEnd };
+    for (const u of rederivePhases(phases, before, after)) await tx.update(projectPhases).set({ startsAt: u.startsAt, endsAt: u.endsAt }).where(eq(projectPhases.id, u.id));
+  }
   if (datesChanged) {
-    await tx.delete(projectPhases).where(eq(projectPhases.projectId, o.projectId));
-    for (const [kind, a, b] of phaseTimes(input.periodStart, input.eventStart, input.eventEnd, input.periodEnd)) await tx.insert(projectPhases).values({ projectId: o.projectId, kind, startsAt: a, endsAt: b });
     if (o.status === "confirmado" || o.status === "en_curso") {
       try {
         await reserveOrder(tx, input.orderId, "confirmado", { userId: ctx.user.id });
@@ -196,7 +193,7 @@ export const changeOrderStatus = tenantAction(
   z.object({ orderId: z.string().uuid(), status: z.enum(["borrador", "consulta", "opcion", "confirmado", "en_curso", "devuelto", "cancelado"]), optionDays: z.number().int().min(1).max(90).optional() }),
   "comercial",
   async ({ orderId, status, optionDays }, tx, ctx): Promise<{ status: string; shortages: ShortageView[] }> => {
-    if (status === "confirmado" && !["administrador", "comercial"].includes(ctx.role)) throw new UserError("No tienes permiso para confirmar pedidos.");
+    if (status === "confirmado" && !can(ctx.role, "confirmar")) throw new UserError("No tienes permiso para confirmar pedidos.");
     const [o] = await tx.select().from(orders).where(eq(orders.id, orderId));
     if (!o) throw new UserError("Pedido no encontrado");
     if (status === "confirmado" || status === "opcion" || status === "consulta") {
@@ -357,8 +354,21 @@ export const sendQuote = tenantAction(
   },
 );
 
+/** The client said no (by phone, email…): the version is closed and its link can no longer be accepted. Sending it again reopens it. */
+export const rejectQuote = tenantAction(z.object({ quoteId: z.string().uuid() }), "comercial", async ({ quoteId }, tx, ctx) => {
+  const [q] = await tx.select().from(quotes).where(eq(quotes.id, quoteId)).for("update");
+  if (!q) throw new UserError("Presupuesto no encontrado");
+  if (q.status === "aceptado") throw new UserError("El cliente ya ha aceptado este presupuesto.");
+  await tx.update(quotes).set({ status: "rechazado", rejectedAt: new Date() }).where(eq(quotes.id, quoteId));
+  await audit(tx, ctx, "quote", quoteId, "estado", { numero: q.number, de: q.status, a: "rechazado" });
+  revalidatePath(`/app/pedidos/${q.orderId}`);
+  return { ok: true };
+});
+
 export const saveAsTemplate = tenantAction(z.object({ name: z.string().trim().min(2).max(80), composition: compositionSchema }), "comercial", async (input, tx, ctx) => {
-  const [row] = await tx.insert(tentTemplates).values({ name: input.name, composition: input.composition, description: `Guardada por ${ctx.user.name}` }).returning({ id: tentTemplates.id });
+  // a template is venue-independent: the venue plan placed under the tents is not kept
+  const [row] = await tx.insert(tentTemplates).values({ name: input.name, composition: { ...input.composition, site: null }, description: `Guardada por ${ctx.user.name}` }).returning({ id: tentTemplates.id });
+  revalidatePath("/app/carpas/plantillas");
   return { id: row!.id };
 });
 

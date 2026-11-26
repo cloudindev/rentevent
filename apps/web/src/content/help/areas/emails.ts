@@ -28,7 +28,7 @@ export const area: HelpArea = {
         { title: "Abre Emails", text: "Entra en **Emails**. En la pestaña **Bandeja compartida** verás la lista a la izquierda y el correo abierto a la derecha. La cabecera indica cuántos hay sin leer." },
         { title: "Filtra la lista", text: "Usa **Todos**, **No leídos**, **Recibidos** o **Enviados**. Los no leídos aparecen en negrita con un punto de color." },
         { title: "Abre un correo", text: "Pulsa un correo de la lista. Se marca como leído al abrirlo y muestra el asunto, el remitente o destinatario, la fecha y el registro vinculado." },
-        { title: "Revisa el hilo", text: "Si hay respuestas, aparecen plegadas encima del mensaje. Pulsa cada una para desplegarla." },
+        { title: "Revisa el hilo", text: "Si el correo forma parte de un hilo, el mensaje original y las demás respuestas aparecen plegados encima del mensaje abierto. Pulsa cada uno para desplegarlo." },
         { title: "Déjalo pendiente", text: "Pulsa **Marcar como no leído** para que vuelva a contar como pendiente." },
       ],
     },

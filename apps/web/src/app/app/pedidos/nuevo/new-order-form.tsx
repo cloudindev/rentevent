@@ -11,7 +11,7 @@ import { fromLocalInput } from "../[id]/header-sheet";
 
 type Opt = { id: string; name: string };
 
-export function NewOrderForm({ clients, venues, templates, projects, families, templateId, projectId }: { clients: Opt[]; venues: Opt[]; templates: Opt[]; projects: (Opt & { number: string })[]; families: Opt[]; templateId: string | null; projectId: string | null }) {
+export function NewOrderForm({ clients, venues, templates, projects, families, templateId, projectId }: { clients: Opt[]; venues: (Opt & { anchoringAllowed: boolean })[]; templates: Opt[]; projects: (Opt & { number: string; venueId: string | null })[]; families: Opt[]; templateId: string | null; projectId: string | null }) {
   const router = useRouter();
   const today = new Date().toISOString().slice(0, 10);
   const [v, setV] = useState({
@@ -28,6 +28,9 @@ export function NewOrderForm({ clients, venues, templates, projects, families, t
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [pending, start] = useTransition();
+  // the venue belongs to the project: an existing project with a venue imposes it
+  const projectVenueId = projects.find((p) => p.id === v.projectId)?.venueId ?? null;
+  const venueId = projectVenueId ?? v.venueId;
   const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setV({ ...v, [k]: e.target.value });
   return (
     <Card>
@@ -41,7 +44,7 @@ export function NewOrderForm({ clients, venues, templates, projects, families, t
                 title: v.title,
                 clientId: v.clientId && v.clientId !== "__new" ? v.clientId : null,
                 newClientName: v.clientId === "__new" ? v.newClientName : null,
-                venueId: v.venueId || null,
+                venueId: venueId || null,
                 projectId: v.projectId || null,
                 loadAt: fromLocalInput(v.loadAt),
                 eventStart: fromLocalInput(v.eventStart),
@@ -69,23 +72,22 @@ export function NewOrderForm({ clients, venues, templates, projects, families, t
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </NativeSelect>
           </Field>
-          {v.clientId === "__new" ? (
+          {v.clientId === "__new" && (
             <Field label="Nombre del nuevo cliente" htmlFor="n-newc"><Input id="n-newc" value={v.newClientName} onChange={set("newClientName")} /></Field>
-          ) : (
-            <Field label="Lugar" htmlFor="n-venue">
-              <NativeSelect id="n-venue" value={v.venueId} onChange={set("venueId")}>
-                <option value="">Sin lugar</option>
-                {venues.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-              </NativeSelect>
-            </Field>
           )}
+          <Field label="Lugar" htmlFor="n-venue" hint={projectVenueId ? "Es el lugar del proyecto elegido" : v.projectId && v.venueId ? "Se guardará como lugar del proyecto" : undefined}>
+            <NativeSelect id="n-venue" value={venueId} onChange={set("venueId")} disabled={!!projectVenueId}>
+              <option value="">Sin lugar</option>
+              {venues.map((x) => <option key={x.id} value={x.id}>{x.name}{x.anchoringAllowed ? "" : " · sin anclaje"}</option>)}
+            </NativeSelect>
+          </Field>
           <Field label="Proyecto" htmlFor="n-proj" hint="Si lo dejas vacío se crea uno nuevo">
             <NativeSelect id="n-proj" value={v.projectId} onChange={set("projectId")}>
               <option value="">Nuevo proyecto</option>
               {projects.map((p) => <option key={p.id} value={p.id}>{p.number} · {p.name}</option>)}
             </NativeSelect>
           </Field>
-          <Field label="Empezar con" htmlFor="n-start">
+          <Field label="Empezar con" htmlFor="n-start" className={v.clientId === "__new" ? "sm:col-span-2" : undefined}>
             <NativeSelect id="n-start" value={v.start} onChange={set("start")}>
               <option value="">Pedido vacío</option>
               <optgroup label="Carpa">{families.map((f) => <option key={f.id} value={`f:${f.id}`}>{f.name}</option>)}</optgroup>

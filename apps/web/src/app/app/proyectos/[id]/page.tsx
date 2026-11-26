@@ -10,7 +10,7 @@ import { DateChip, PageBody, PageHeader } from "@/components/app/page-header";
 import { StatusPill } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { can, canSeeField } from "@/lib/permissions";
+import { can, canCollaborate, canSeeField } from "@/lib/permissions";
 import { formatDateTime, formatEUR, formatRange, formatDate } from "@/lib/utils";
 import { fileUrl } from "@/lib/adapters/storage";
 import { tenantDb } from "@/server/context";
@@ -42,18 +42,27 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     const purch = await tx.select().from(purchases).where(eq(purchases.projectId, id));
     const te = sh.length ? await tx.select({ shiftId: timeEntries.shiftId, workerId: timeEntries.workerId, clockIn: timeEntries.clockIn, clockOut: timeEntries.clockOut, breakMinutes: timeEntries.breakMinutes }).from(timeEntries).where(inArray(timeEntries.shiftId, sh.map((s) => s.id))) : [];
     const inv = await tx.select().from(invoices).where(eq(invoices.projectId, id));
-    return { p, client, venue, phases, os, qs, sh, asg, vs, tk, fl, nt, au, lines, subs, purch, te, inv, ctx };
+    const canEdit = can(ctx.role, "comercial");
+    const clientOpts = canEdit ? await tx.select({ id: contacts.id, name: contacts.name }).from(contacts).where(and(eq(contacts.kind, "cliente"), p.clientId ? or(eq(contacts.archived, false), eq(contacts.id, p.clientId)) : eq(contacts.archived, false))).orderBy(asc(contacts.name)) : [];
+    const venueOpts = canEdit ? await tx.select({ id: venues.id, name: venues.name }).from(venues).orderBy(asc(venues.name)) : [];
+    return { p, client, venue, phases, os, qs, sh, asg, vs, tk, fl, nt, au, lines, subs, purch, te, inv, clientOpts, venueOpts, ctx };
   });
   if (!d) notFound();
   const { p, ctx } = d;
   const showMargin = canSeeField(ctx.role, "margen", ctx.fieldPermissions);
   const latestQuote = (orderId: string) => d.qs.find((q) => q.orderId === orderId);
   const activeOrders = d.os.filter((o) => o.status !== "cancelado");
-  const revenueQuoted = activeOrders.reduce((s, o) => s + Number(latestQuote(o.id)?.total ?? 0), 0) / 1.21;
+  // taxable base frozen in the quote (handles mixed VAT rates); very old quotes without it fall back to 21 %
+  const quoteBase = (q: (typeof d.qs)[number] | undefined) => {
+    if (!q) return 0;
+    const t = (q.snapshot as { totals?: { taxable?: unknown } } | null)?.totals?.taxable;
+    return typeof t === "number" ? t : Number(q.total) / 1.21;
+  };
+  const revenueQuoted = activeOrders.reduce((s, o) => s + quoteBase(latestQuote(o.id)), 0);
   const invoiced = d.inv.filter((i) => i.status !== "borrador" && i.status !== "anulada").reduce((s, i) => s + Number(i.subtotal), 0);
   const revenue = Math.max(invoiced, revenueQuoted);
   const linesCost = d.lines.filter((l) => activeOrders.some((o) => o.id === l.orderId)).reduce((s, l) => s + Number(l.unitCost) * Number(l.quantity), 0);
-  const subsCost = d.subs.reduce((s, x) => s + Number(x.cost), 0);
+  const subsCost = d.subs.filter((x) => x.status !== "cancelado").reduce((s, x) => s + Number(x.cost), 0);
   const purchCost = d.purch.filter((x) => !x.subrentalId).reduce((s, x) => s + Number(x.base), 0);
   const workerCost = new Map(d.asg.map((a) => [a.workerId, Number(a.cost)]));
   const crewReal = d.te.reduce((s, t) => s + (t.clockOut ? ((t.clockOut.getTime() - t.clockIn.getTime()) / 3_600_000 - t.breakMinutes / 60) * (workerCost.get(t.workerId) ?? 18) : 0), 0);
@@ -67,7 +76,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       <PageHeader icon={Briefcase} title={`${p.number} · ${p.name}`} back={{ href: "/app/proyectos", label: "Proyectos" }}>
         <DateChip>{formatRange(p.startsAt, p.endsAt)}</DateChip>
         <StatusPill tone={st.tone}>{st.label}</StatusPill>
-        {can(ctx.role, "comercial") && <ProjectActions project={{ id: p.id, name: p.name, startsAt: p.startsAt?.toISOString() ?? null }} />}
+        {can(ctx.role, "comercial") && <ProjectActions project={{ id: p.id, name: p.name, startsAt: p.startsAt?.toISOString() ?? null, clientId: p.clientId, venueId: p.venueId, description: p.description, color: p.color, orders: d.os.length }} clients={d.clientOpts} venues={d.venueOpts} />}
       </PageHeader>
       <PageBody>
         <div className="grid gap-3 sm:grid-cols-4">
@@ -76,6 +85,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           <Card className="p-4"><p className="text-xs text-muted-foreground">Pedidos</p><p className="mt-1 font-medium">{activeOrders.length} activos · {formatEUR(revenueQuoted)} sin IVA</p></Card>
           <Card className="p-4"><p className="text-xs text-muted-foreground">Personal</p><p className="mt-1 font-medium">{d.sh.length} turnos · {new Set(d.asg.map((a) => a.workerId)).size} personas</p></Card>
         </div>
+        {p.description && <p className="whitespace-pre-wrap text-sm text-muted-foreground">{p.description}</p>}
         <Card>
           <CardHeader><CardTitle>Cronograma</CardTitle></CardHeader>
           <CardContent>
@@ -96,7 +106,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                       <li key={o.id} className="flex items-center justify-between gap-3 py-2.5">
                         <Link className="min-w-0 truncate hover:underline" href={`/app/pedidos/${o.id}`}><span className="text-muted-foreground">{o.number}</span> · {o.title}</Link>
                         <span className="flex shrink-0 items-center gap-3">
-                          <span className="tabular hidden sm:inline">{latestQuote(o.id) ? formatEUR(Number(latestQuote(o.id)!.total)) : "—"}</span>
+                          <span className="tabular hidden sm:inline" title="Último presupuesto, sin IVA">{latestQuote(o.id) ? formatEUR(quoteBase(latestQuote(o.id))) : "—"}</span>
                           <StatusPill tone={ORDER_STATUS[o.status]?.tone ?? "neutral"}>{ORDER_STATUS[o.status]?.label}</StatusPill>
                         </span>
                       </li>
@@ -152,7 +162,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             )}
             <Card>
               <CardHeader><CardTitle>Tareas</CardTitle></CardHeader>
-              <CardContent><TasksPanel projectId={p.id} tasks={d.tk.map((t) => ({ id: t.id, title: t.title, done: t.done, dueAt: t.dueAt?.toISOString() ?? null }))} /></CardContent>
+              <CardContent><TasksPanel projectId={p.id} canEdit={canCollaborate(ctx.role)} tasks={d.tk.map((t) => ({ id: t.id, title: t.title, done: t.done, dueAt: t.dueAt?.toISOString() ?? null }))} /></CardContent>
             </Card>
             <Card>
               <CardHeader><CardTitle>Notas</CardTitle></CardHeader>

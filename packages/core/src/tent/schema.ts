@@ -224,6 +224,47 @@ export const PART_ROLES = [
 ] as const;
 export type PartRole = (typeof PART_ROLES)[number];
 
+/** Spanish names of the 3D parts (item field "Pieza en el 3D"). */
+export const PART_ROLE_LABELS: Record<PartRole, string> = {
+  cercha: "Cercha",
+  pilar: "Pilar",
+  placa_base: "Placa base",
+  correa: "Correa",
+  tensor: "Tensor",
+  lona_techo_blanca: "Lona de techo blanca",
+  lona_techo_transparente: "Lona de techo transparente",
+  lateral_blanco: "Lateral blanco",
+  lateral_transparente: "Lateral transparente",
+  lateral_ventana: "Lateral con ventana",
+  lateral_puerta: "Lateral con puerta",
+  pico: "Pico (frontón)",
+  frontal_blanco: "Frontal blanco",
+  frontal_transparente: "Frontal transparente",
+  peso: "Peso de lastre",
+  estaca: "Estaca",
+  tarima: "Tarima",
+  suelo: "Suelo",
+  moqueta: "Moqueta",
+  escenario: "Escenario",
+  mesa: "Mesa",
+  silla: "Silla",
+  canalon: "Canalón",
+  jaima: "Jaima",
+  otro: "Otro (no se dibuja)",
+};
+
+/**
+ * What `roleAmount` means for the roles where one item unit is not one 3D piece
+ * (floors and stage are drawn by m², the gutter by metres). Other roles: one unit = one piece.
+ */
+export const ROLE_AMOUNT_FIELDS: Partial<Record<PartRole, { label: string; hint: string }>> = {
+  tarima: { label: "m² por unidad", hint: "Superficie que cubre cada unidad (p. ej. 2 para un módulo de 2x1 m)" },
+  suelo: { label: "m² por unidad", hint: "Superficie que cubre cada unidad" },
+  moqueta: { label: "m² por unidad", hint: "Superficie que cubre cada unidad (1 si se cuenta por m²)" },
+  escenario: { label: "m² por unidad", hint: "Superficie que cubre cada módulo de escenario" },
+  canalon: { label: "Metros por unidad", hint: "Longitud de cada canalón; con 1 se asumen 5 m" },
+};
+
 export type BomItem = {
   id: string;
   name: string;

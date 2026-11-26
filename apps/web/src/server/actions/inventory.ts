@@ -1,11 +1,12 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { eq, itemUnits, items, kitItems, kits, movements, stockCounts } from "@rentevent/db";
+import { eq, ilike, itemUnits, items, kitItems, kits, movements, or, stockCounts } from "@rentevent/db";
 import { PART_ROLES } from "@rentevent/core";
 import { audit, diffOf } from "../audit";
 import { tenantAction, UserError } from "../action";
-import { UNIT_STATUS_LABEL } from "../warehouse/logic";
+import { nextSerials } from "../warehouse/logic";
+import { changeUnitStatus } from "../warehouse/maintenance";
 import { logUnitEvents, moveUnit as moveUnitSvc, packUnit as packUnitSvc, setBulkContent as setBulkSvc, unpackUnit as unpackUnitSvc } from "../warehouse/tracking";
 
 const itemInput = z.object({
@@ -76,34 +77,29 @@ export const patchItem = tenantAction(
 export const addUnits = tenantAction(z.object({ itemId: z.string().uuid(), count: z.coerce.number().int().min(1).max(500) }), "inventario", async ({ itemId, count }, tx, ctx) => {
   const [it] = await tx.select().from(items).where(eq(items.id, itemId));
   if (!it) throw new UserError("Artículo no encontrado");
-  const existing = await tx.select({ serial: itemUnits.serial }).from(itemUnits).where(eq(itemUnits.itemId, itemId));
-  let n = existing.length;
-  const rows = Array.from({ length: count }, () => {
-    n++;
-    const serial = `${it.sku}-${String(n).padStart(3, "0")}`;
-    return { itemId, serial, qrCode: `RV-${serial}` };
-  });
+  // serials and QR codes are matched tenant-wide (scans look them up across all items)
+  const like = (s: string) => `${s.replace(/[\\%_]/g, "\\$&")}-%`;
+  const taken = await tx.select({ serial: itemUnits.serial, qrCode: itemUnits.qrCode }).from(itemUnits).where(or(ilike(itemUnits.serial, like(it.sku)), ilike(itemUnits.qrCode, like(`RV-${it.sku}`))));
+  const rows = nextSerials(it.sku, count, taken.flatMap((u) => [u.serial, u.qrCode])).map((r) => ({ itemId, ...r }));
   const created = await tx.insert(itemUnits).values(rows).onConflictDoNothing().returning({ id: itemUnits.id });
+  if (!created.length) throw new UserError("No se ha podido crear ninguna unidad: los números de serie ya existen. Vuelve a intentarlo.");
   await logUnitEvents(tx, ctx, created.map((u) => u.id), "alta", { note: "Unidad dada de alta" });
   if (it.kind !== "seriado") await tx.update(items).set({ kind: "seriado" }).where(eq(items.id, itemId));
-  await audit(tx, ctx, "item", itemId, "editar", { unidadesSeriadas: count });
+  await audit(tx, ctx, "item", itemId, "editar", { unidadesSeriadas: created.length });
   revalidatePath(`/app/inventario/${itemId}`);
-  return { count };
+  return { count: created.length };
 });
 
 export const setUnitStatus = tenantAction(
   z.object({ id: z.string().uuid(), status: z.enum(["disponible", "reparacion", "limpieza", "baja", "perdida"]) }),
   "inventario",
   async ({ id, status }, tx, ctx) => {
-    const [before] = await tx.select().from(itemUnits).where(eq(itemUnits.id, id));
-    if (!before) throw new UserError("Unidad no encontrada");
-    if (before.status === status) return { id };
-    // back in the warehouse (or written off) means it is no longer out on an order
-    const [u] = await tx.update(itemUnits).set({ status, currentOrderId: status === "perdida" ? before.currentOrderId : null }).where(eq(itemUnits.id, id)).returning();
-    await logUnitEvents(tx, ctx, [id], "estado", { note: `${UNIT_STATUS_LABEL[before.status] ?? before.status} → ${UNIT_STATUS_LABEL[status]}` });
-    await audit(tx, ctx, "item_unit", id, "estado", { status });
-    revalidatePath(`/app/inventario/${u!.itemId}`);
+    const u = await changeUnitStatus(tx, ctx, id, status);
+    revalidatePath(`/app/inventario/${u.itemId}`);
     revalidatePath(`/app/inventario/unidades/${id}`);
+    revalidatePath("/app/inventario");
+    revalidatePath("/app/mantenimiento");
+    revalidatePath("/app/mantenimiento/limpieza");
     return { id };
   },
 );

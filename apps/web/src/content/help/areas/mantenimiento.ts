@@ -6,7 +6,7 @@ export const area: HelpArea = {
   summary: "Reparaciones, limpieza de lonas, revisiones periódicas e historial de cada artículo.",
   overview: [
     "Mantenimiento recoge todo lo que está fuera de servicio y el plan de revisiones del material. Mientras una reparación o una limpieza está abierta, esas unidades no cuentan como disponibles para los pedidos.",
-    "Muchas tarjetas llegan solas: lo que vuelve dañado al cerrar un retorno en Almacén crea una reparación, las lonas marcadas como sucias crean una limpieza y una revisión **No apta** abre una reparación. También puedes crearlas a mano.",
+    "Muchas tarjetas llegan solas: lo que vuelve dañado al cerrar un retorno en Almacén crea una reparación, las lonas marcadas como sucias crean una limpieza, una revisión **No apta** abre una reparación y marcar una unidad seriada como **En reparación** o **En limpieza** abre la suya. También puedes crearlas a mano.",
     "La pestaña **Revisiones** calcula cuándo toca revisar cada artículo según el campo **Revisión cada (días)** de su ficha en Inventario. Los artículos seriados se revisan unidad a unidad y el resto como lote.",
     "En **Historial** ves, para un artículo, sus salidas, retornos, daños, ajustes, reparaciones, limpiezas y revisiones en orden cronológico.",
   ],
@@ -64,7 +64,7 @@ export const area: HelpArea = {
         { title: "Empieza", text: "Pulsa **Empezar** para pasar la tarjeta a **En curso**." },
         { title: "Da por limpia", text: "Pulsa **Limpia**, añade coste y resolución si quieres y pulsa **Confirmar**. Las lonas vuelven a estar disponibles." },
       ],
-      notes: ["Mientras la limpieza está abierta, esas lonas no cuentan como disponibles para los pedidos."],
+      notes: ["Mientras la limpieza está abierta, esas lonas no cuentan como disponibles para los pedidos.", "Las lonas con número de serie que vuelven sucias tienen una tarjeta por unidad: la unidad está **En limpieza** y vuelve a **Disponible** al darla por limpia."],
     },
     {
       slug: "revisiones",

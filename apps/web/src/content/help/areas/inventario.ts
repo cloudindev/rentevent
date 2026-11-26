@@ -136,7 +136,7 @@ export const area: HelpArea = {
         { title: "Abre la ficha del artículo", text: "Entra en **Inventario** y abre el artículo." },
         { title: "Pulsa Generar QR", text: "Pulsa **Generar QR**. Se abre **Unidades con código QR**." },
         { title: "Indica cuántas", text: "Escribe el **Número de unidades** que quieres crear (de 1 a 500 por vez)." },
-        { title: "Crea las unidades", text: "Pulsa **Crear unidades**. Cada unidad recibe un número de serie con el SKU y un número correlativo (por ejemplo MIC-001) y un código QR propio.", tip: "Si el artículo no era seriado, pasa a **Seriado** automáticamente." },
+        { title: "Crea las unidades", text: "Pulsa **Crear unidades**. Cada unidad recibe un número de serie con el SKU y un número correlativo (por ejemplo MIC-001) y un código QR propio. Si un número ya está en uso (por ejemplo, porque cambiaste el número de serie de otra unidad), se salta y se usa el siguiente libre.", tip: "Si el artículo no era seriado, pasa a **Seriado** automáticamente." },
         { title: "Imprime las etiquetas", text: "En la sección **Unidades seriadas** pulsa **Imprimir etiquetas QR** para sacar el PDF y pégalas en cada pieza." },
       ],
       notes: ["Cada alta queda en el historial de la unidad como **Alta**."],
@@ -193,9 +193,12 @@ export const area: HelpArea = {
         { title: "Abre la unidad", text: "Entra en la ficha de la unidad." },
         { title: "Abre el menú", text: "Pulsa **Más acciones** (tres puntos). En **Marcar como** verás los estados distintos del actual." },
         { title: "Elige el estado", text: "Pulsa **Disponible**, **En reparación**, **En limpieza**, **Perdida** o **De baja**. La unidad cambia al momento.", tip: "Si la unidad estaba fuera en un pedido, al marcarla con cualquier estado salvo **Perdida** deja de estar asociada a ese pedido." },
-        { title: "Comprueba el historial", text: "El cambio queda en el **Historial** como **Cambio de estado**, con el estado anterior y el nuevo." },
+        { title: "Comprueba el historial", text: "El cambio queda en el **Historial** como **Cambio de estado**, con el estado anterior y el nuevo (o como **A reparación** / **A limpieza** si la mandas al taller)." },
       ],
-      notes: ["Normalmente no necesitas hacerlo a mano: las salidas, los retornos, las reparaciones y las revisiones cambian el estado de las unidades solas."],
+      notes: [
+        "El stock del artículo se ajusta solo: **En reparación** o **En limpieza** abre una reparación o una limpieza de esa unidad en Mantenimiento y la quita de lo disponible; volver a **Disponible** cierra esa reparación. **Perdida** o **De baja** bajan en uno el stock total y recuperarla lo vuelve a subir. Todo queda en **Movimientos**.",
+        "Normalmente no necesitas hacerlo a mano: las salidas, los retornos, las reparaciones y las revisiones cambian el estado de las unidades solas.",
+      ],
     },
     {
       slug: "editar-serie-notas",

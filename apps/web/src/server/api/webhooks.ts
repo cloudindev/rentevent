@@ -1,6 +1,7 @@
 import "server-only";
 import { and, eq, webhookDeliveries, webhooks, type Tx } from "@rentevent/db";
 import { signWebhook } from "./keys";
+import { loadPlanAccess } from "../billing/tenant-access";
 
 export const WEBHOOK_EVENTS = ["order.created", "order.updated", "order.confirmed", "order.cancelled", "quote.sent", "quote.accepted", "invoice.issued", "contact.created"] as const;
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
@@ -29,6 +30,8 @@ async function deliver(url: string, secret: string, event: string, body: string)
  */
 export async function dispatchWebhook(tx: Tx, event: WebhookEvent | string, payload: unknown) {
   const hooks = (await tx.select().from(webhooks).where(eq(webhooks.active, true))).filter((h) => h.events.includes(event) || h.events.includes("*"));
+  // webhooks are part of the plan that includes the API (always on during the free trial)
+  if (hooks.length === 0 || !(await loadPlanAccess(tx)).api) return [];
   const results: { webhookId: string; ok: boolean }[] = [];
   for (const h of hooks) results.push({ webhookId: h.id, ok: await deliverToHook(tx, h, event, payload) });
   return results;

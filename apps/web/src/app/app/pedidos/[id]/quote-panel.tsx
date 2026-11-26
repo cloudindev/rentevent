@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Copy, ExternalLink, FileText, Receipt, Send, Warehouse } from "lucide-react";
+import { Ban, Copy, ExternalLink, FileText, Receipt, Send, Warehouse } from "lucide-react";
 import { toast } from "sonner";
 import { StatusPill } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,16 @@ import { Field, Input, Textarea } from "@/components/ui/input";
 import { formatDate, formatEUR } from "@/lib/utils";
 import type { TentViewerApi } from "@/components/tent3d";
 import type { OrderWorkspaceData } from "@/server/orders";
-import { createQuote, duplicateOrder, sendQuote } from "@/server/actions/orders";
+import { createQuote, duplicateOrder, rejectQuote, sendQuote } from "@/server/actions/orders";
 import { createInvoiceFromOrderAction } from "@/server/actions/finance";
 
-const QUOTE_TONE = { borrador: "neutral", enviado: "info", aceptado: "success", rechazado: "danger" } as const;
+const QUOTE_STATUS: Record<string, { label: string; tone: "neutral" | "info" | "success" | "danger" }> = {
+  borrador: { label: "Borrador", tone: "neutral" },
+  enviado: { label: "Enviado", tone: "info" },
+  aceptado: { label: "Aceptado", tone: "success" },
+  rechazado: { label: "Rechazado", tone: "danger" },
+  sustituido: { label: "Sustituido", tone: "neutral" },
+};
 
 async function blobToDataUrl(b: Blob): Promise<string> {
   return new Promise((res) => {
@@ -69,11 +75,16 @@ export function QuotePanel({ orderId, quotes, clientEmail, canEdit, canInvoice, 
         <p className="text-sm text-muted-foreground">Aún no hay presupuestos. Se guarda una versión cada vez que lo generas.</p>
       ) : (
         <ul className="divide-y text-sm">
-          {quotes.map((q) => (
+          {quotes.map((q) => {
+            // only the newest version can be accepted by the client; older open ones are superseded
+            const latest = q.version === Math.max(...quotes.map((x) => x.version));
+            const status = !latest && (q.status === "borrador" || q.status === "enviado") ? "sustituido" : q.status;
+            const st = QUOTE_STATUS[status] ?? { label: status, tone: "neutral" as const };
+            return (
             <li key={q.id} className="py-2.5">
               <div className="flex items-center justify-between">
                 <span className="font-medium">v{q.version} · {q.number}</span>
-                <StatusPill tone={QUOTE_TONE[q.status as keyof typeof QUOTE_TONE] ?? "neutral"}>{q.status}</StatusPill>
+                <StatusPill tone={st.tone}>{st.label}</StatusPill>
               </div>
               <p className="text-xs text-muted-foreground">
                 {formatEUR(q.total)} · {formatDate(q.createdAt)}
@@ -82,10 +93,16 @@ export function QuotePanel({ orderId, quotes, clientEmail, canEdit, canInvoice, 
               <div className="mt-1.5 flex flex-wrap gap-1">
                 <Button asChild size="sm" variant="outline"><a href={`/app/pedidos/${orderId}/presupuesto/${q.id}/pdf`} target="_blank" rel="noreferrer"><FileText /> PDF</a></Button>
                 <Button asChild size="sm" variant="ghost"><a href={`/p/presupuesto/${q.publicToken}`} target="_blank" rel="noreferrer"><ExternalLink /> Enlace</a></Button>
-                {canEdit && q.status !== "aceptado" && <Button size="sm" variant="ghost" onClick={() => setSend({ id: q.id, number: q.number })}><Send /> Enviar</Button>}
+                {canEdit && latest && q.status !== "aceptado" && <Button size="sm" variant="ghost" onClick={() => setSend({ id: q.id, number: q.number })}><Send /> {q.status === "rechazado" ? "Reenviar" : "Enviar"}</Button>}
+                {canEdit && latest && (q.status === "borrador" || q.status === "enviado") && (
+                  <Button size="sm" variant="ghost" disabled={pending} title="El cliente lo ha rechazado: su enlace deja de poder aceptarse" onClick={() => start(async () => { const r = await rejectQuote({ quoteId: q.id }); if (!r.ok) { toast.error(r.error); return; } toast.success("Presupuesto marcado como rechazado"); router.refresh(); })}>
+                    <Ban /> Marcar rechazado
+                  </Button>
+                )}
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
       <div className="mt-3 flex flex-wrap gap-1 border-t pt-3">

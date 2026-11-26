@@ -3,6 +3,8 @@ import { tenantSettings, withTenant } from "@rentevent/db";
 import { env } from "@/lib/env";
 import { can } from "@/lib/permissions";
 import { planById } from "@/server/billing/plans";
+import { seatsError } from "@/server/billing/access";
+import { seatsInUse } from "@/server/billing/tenant-access";
 import { getAppContext } from "@/server/context";
 import { audit } from "@/server/audit";
 
@@ -15,6 +17,8 @@ export async function GET(req: Request) {
   const plan = planById(u.searchParams.get("plan") ?? "");
   if (!plan || plan.id === "empresa") return new Response("Plan no válido", { status: 400 });
   const seats = Math.min(500, Math.max(1, Number(u.searchParams.get("seats") ?? 5)));
+  const bad = seatsError(plan.id, seats, (await seatsInUse(ctx.tenantId)).members);
+  if (bad) return new Response(bad, { status: 400 });
   await withTenant(ctx.tenantId, async (tx) => {
     await tx.update(tenantSettings).set({ plan: plan.id, planSeats: seats, subscriptionStatus: "active", modules: plan.modules, stripeCustomerId: null });
     await audit(tx, ctx, "subscription", ctx.tenantId, "editar", { plan: plan.id, seats, modo: "simulado", anual: u.searchParams.get("annual") === "1" });

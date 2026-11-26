@@ -28,6 +28,7 @@ export const area: HelpArea = {
         { title: "Aplica", text: "Pulsa **Aplicar**. Todos los bloques de la página se recalculan con ese periodo." },
         { title: "Lee los totales", text: "Arriba tienes cuatro cifras: **Facturado (base)**, **Ocupación media de cerchas**, **Horas planificadas** y **Horas fichadas**." },
       ],
+      notes: ["**Facturado (base)**, **Ingresos por mes** y **Clientes principales** solo se muestran a quien tiene permiso de Finanzas. **Rentabilidad por proyecto** se muestra con permiso de Finanzas o de ver márgenes."],
     },
     {
       slug: "ocupacion-carpas",
@@ -51,7 +52,10 @@ export const area: HelpArea = {
         { title: "Revisa los clientes", text: "En **Clientes principales** ves los diez clientes con más base facturada en el periodo." },
         { title: "Exporta si lo necesitas", text: "Pulsa **CSV** en cada bloque. La exportación de clientes incluye hasta 100 clientes con su número de facturas." },
       ],
-      notes: ["Solo cuentan las facturas emitidas, cobradas o vencidas, según su fecha de emisión."],
+      notes: [
+        "Solo cuentan las facturas emitidas, cobradas o vencidas, según su fecha de emisión.",
+        "Estos bloques y sus exportaciones requieren el permiso de Finanzas.",
+      ],
     },
     {
       slug: "rentabilidad-proyectos",
@@ -65,6 +69,7 @@ export const area: HelpArea = {
         { title: "Abre el proyecto", text: "Pulsa el nombre del proyecto para ir a su ficha." },
       ],
       notes: [
+        "El bloque solo aparece a quien tiene permiso de Finanzas o de ver márgenes.",
         "Las columnas **Coste** y **Margen** solo se muestran a quien tiene permiso para ver márgenes; la exportación CSV también las omite en ese caso.",
         "El coste de personal solo incluye las horas fichadas en turnos del proyecto y con salida registrada.",
       ],
@@ -76,7 +81,7 @@ export const area: HelpArea = {
       path: "/app/analytics",
       steps: [
         { title: "Busca el bloque", text: "Baja hasta **Horas de personal**. Aparece cada trabajador activo con turnos o fichajes en el periodo." },
-        { title: "Lee las columnas", text: "Tienes **Tipo**, **Planificadas** (turnos asignados), **Fichadas** y **Diferencia**." },
+        { title: "Lee las columnas", text: "Tienes **Tipo** (Plantilla, Eventual o Autónomo), **Planificadas** (turnos asignados que el trabajador no ha rechazado, igual que en Fichajes), **Fichadas** y **Diferencia**." },
         { title: "Busca desviaciones", text: "Una diferencia positiva, en amarillo, indica que se ha fichado más de lo planificado. Revisa esos casos en **Personal** > **Fichajes**." },
       ],
       notes: ["Solo cuentan los fichajes con salida registrada, descontando la pausa."],

@@ -17,7 +17,8 @@ import {
   type VehicleType,
 } from "@rentevent/core";
 
-export type FamilyLite = StructureFamily & { price: number; priceMode: "m2" | "ml" };
+/** `active: false` = deactivated family, loaded only so existing orders keep working. */
+export type FamilyLite = StructureFamily & { price: number; priceMode: "m2" | "ml"; active?: boolean };
 export type ItemLite = BomItem & { price: number; priceMode: PriceMode; costPrice: number; category: string; kind: string; stockTotal: number; stockRepair: number };
 export type KitLite = { id: string; sku: string; name: string; price: number; items: { itemId: string; quantity: number }[] };
 

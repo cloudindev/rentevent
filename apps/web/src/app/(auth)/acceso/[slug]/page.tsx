@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { eq, organization, systemDb, tenantSettings } from "@rentevent/db";
 import { env } from "@/lib/env";
 import { initials } from "@/lib/utils";
+import { brandAccent } from "@/lib/brand-color";
 import { AuthSplit } from "@/components/auth-split";
 import { LoginForm } from "../login-form";
 import { LogoWhite } from "@/components/brand";
@@ -26,11 +27,18 @@ export default async function CompanyLogin({ params }: { params: Promise<{ slug:
   const { slug } = await params;
   const c = await company(slug);
   if (!c) notFound();
+  // the company's brand colour (Configuración > Empresa) tints this page: initials, side panel and the sign-in button
+  const accent = brandAccent(c.brand);
   const logo = c.logo ? (
     <img src={c.logo} alt={c.name} className="h-10 w-auto" />
   ) : (
     <span className="flex items-center gap-3">
-      <span className="flex size-10 items-center justify-center rounded-xl bg-ink text-sm font-semibold text-white dark:bg-white dark:text-ink">{initials(c.name)}</span>
+      <span
+        className="flex size-10 items-center justify-center rounded-xl bg-ink text-sm font-semibold text-white dark:bg-white dark:text-ink"
+        style={accent ? { backgroundColor: accent.bg, color: accent.fg } : undefined}
+      >
+        {initials(c.name)}
+      </span>
       <span className="text-lg font-semibold">{c.name}</span>
     </span>
   );
@@ -38,9 +46,14 @@ export default async function CompanyLogin({ params }: { params: Promise<{ slug:
     <AuthSplit
       logo={logo}
       aside={
-        <div className="flex h-full flex-col justify-between p-12 text-white">
+        <div
+          className="relative flex h-full flex-col justify-between p-12 text-white"
+          style={accent ? { backgroundImage: `radial-gradient(120% 80% at 100% 0%, ${accent.bg}8c 0%, transparent 60%)` } : undefined}
+        >
+          {accent && <span aria-hidden className="absolute inset-x-0 top-0 h-1.5" style={{ backgroundColor: accent.bg }} />}
           <LogoWhite height={22} />
           <div>
+            {accent && <span aria-hidden className="mb-6 block h-1 w-12 rounded-full" style={{ backgroundColor: accent.bg }} />}
             <p className="text-sm uppercase tracking-wider text-white/50">Espacio de trabajo</p>
             <p className="mt-2 text-4xl font-semibold">{c.name}</p>
             <p className="mt-3 text-white/60">{slug}.{env.rootDomain.split(":")[0]}</p>
@@ -52,7 +65,7 @@ export default async function CompanyLogin({ params }: { params: Promise<{ slug:
       <h1 className="text-2xl font-semibold">Entrar en {c.name}</h1>
       <p className="mt-1 mb-6 text-sm text-muted-foreground">Usa tu cuenta de Rentevent.</p>
       <Suspense>
-        <LoginForm />
+        <LoginForm accent={accent} />
       </Suspense>
     </AuthSplit>
   );

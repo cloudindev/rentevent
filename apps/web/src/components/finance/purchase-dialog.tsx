@@ -130,7 +130,7 @@ export function PurchaseDialog({ options, value, trigger }: { options: PurchaseO
             </Field>
             <Field label="IVA" htmlFor="pu-vat">
               <NativeSelect id="pu-vat" value={f.vatRate} onChange={(e) => set("vatRate", Number(e.target.value))}>
-                {[21, 10, 4, 0].map((v) => (
+                {[...new Set([21, 10, 4, 0, f.vatRate])].sort((a, b) => b - a).map((v) => (
                   <option key={v} value={v}>
                     {v} %
                   </option>

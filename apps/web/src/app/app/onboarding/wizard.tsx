@@ -47,8 +47,9 @@ export function Wizard({ initialStep, slug, company, logoUrl, familyCount, pendi
     <div className="flex justify-between pt-2">
       <Button variant="ghost" disabled={step === 0 || pending} onClick={() => go(step - 1)}>Atrás</Button>
       <div className="flex gap-2">
-        {step < 5 && <Button variant="outline" disabled={pending} onClick={() => go(step + 1)}>Saltar</Button>}
-        {step < 5 ? <Button disabled={pending} onClick={() => go(step + 1)}>Continuar</Button> : <Button disabled={pending} onClick={() => go(6, true)}>Empezar a trabajar</Button>}
+        {/* only rendered on steps 0–4; the last step ("Listo") has its own "Crear un pedido" / "Ir al inicio" buttons that finish the wizard */}
+        <Button variant="outline" disabled={pending} onClick={() => go(step + 1)}>Saltar</Button>
+        <Button disabled={pending} onClick={() => go(step + 1)}>Continuar</Button>
       </div>
     </div>
   );

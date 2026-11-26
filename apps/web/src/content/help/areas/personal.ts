@@ -99,7 +99,7 @@ export const area: HelpArea = {
       path: "/app/personal",
       steps: [
         { title: "Abre la ficha", text: "En **Fichas**, pulsa el nombre del trabajador. Arriba verás su estado de formación y, si está desactivado, la etiqueta **Inactivo**." },
-        { title: "Mira las horas del mes", text: "La tarjeta **Horas este mes** muestra horas **Previstas**, **Reales** y **Extra**, además del número de fichajes y dietas." },
+        { title: "Mira las horas del mes", text: "La tarjeta **Horas este mes** muestra horas **Previstas** (todos los turnos asignados del mes que no ha rechazado, como en Fichajes), **Reales** y **Extra**, además del número de fichajes y dietas." },
         { title: "Revisa los próximos turnos", text: "En **Próximos turnos** tienes inicio, fase, turno, horas y el estado de la asignación: **Pendiente**, **Confirmado** o **Rechazado**." },
         { title: "Consulta el historial y los fichajes", text: "**Historial (60 días)** lista los turnos pasados y **Fichajes del mes** cada entrada y salida, con la pausa, las horas y el origen. Los fichajes corregidos muestran el motivo." },
       ],
@@ -155,9 +155,10 @@ export const area: HelpArea = {
         { title: "Pon título y horario", text: "Escribe el **Título** y elige **Fecha**, **Desde** y **Hasta**.", tip: "La hora de fin tiene que ser posterior a la de inicio, dentro del mismo día." },
         { title: "Elige fase y personas", text: "Selecciona la **Fase** e indica cuántas **Personas** hacen falta, entre 1 y 40." },
         { title: "Vincula proyecto y vehículo", text: "Si procede, elige el **Proyecto** y el **Vehículo**. Escribe el **Lugar** para poder usar la navegación desde el móvil." },
+        { title: "Marca las habilidades", text: "En **Habilidades necesarias** marca lo que debe saber hacer la cuadrilla. Viene marcada **Montador**; desmárcala si no hace falta." },
         { title: "Crea el turno", text: "Pulsa **Crear turno**. Aparece en el tablero como borrador y en la fila **Sin cubrir**." },
       ],
-      notes: ["Los turnos creados así piden la habilidad Montador por defecto."],
+      notes: ["Si no marcas ninguna habilidad, el turno no exige ninguna en concreto."],
     },
     {
       slug: "asignar-personal-arrastrando",
@@ -231,7 +232,7 @@ export const area: HelpArea = {
         { title: "Abre el diálogo", text: "Pulsa **Publicar planning**. El diálogo indica cuántos turnos hay en el periodo y cuántos siguen sin publicar." },
         { title: "Elige los canales", text: "Marca **Notificación push**, **Correo** o **WhatsApp**. Por defecto vienen marcados push y correo." },
         { title: "Publica", text: "Pulsa **Publicar**. Verás cuántos turnos se han publicado y cuántos avisos se han enviado." },
-        { title: "Sigue las respuestas", text: "Cada trabajador recibe un aviso con el número de turnos que tiene y puede confirmarlos o rechazarlos desde la app. Su respuesta aparece en la **Cuadrilla** de cada turno." },
+        { title: "Sigue las respuestas", text: "Cada trabajador recibe un aviso con el número de turnos que tiene y puede confirmarlos o rechazarlos desde la app. Su respuesta aparece en la **Cuadrilla** de cada turno. Si alguien rechaza un turno, los administradores, los jefes de equipo y el responsable del proyecto reciben un correo con el enlace al tablero." },
       ],
       notes: [
         "Los trabajadores solo ven en la app los turnos publicados.",
@@ -293,7 +294,10 @@ export const area: HelpArea = {
         { title: "Comprueba fichajes y lista", text: "La tabla recoge la **Entrada** y la **Salida** fichadas en ese turno, y al lado la **Lista de comprobación** con lo marcado en el parte y las **Incidencias** si las hay." },
         { title: "Imprime", text: "Pulsa **Imprimir**. Sale en formato A4 con espacio para la firma del **Jefe de equipo** y del **Cliente**. Si el cliente ya firmó en el móvil, se imprime su firma." },
       ],
-      notes: ["Si nadie ha fichado en un turno, las horas aparecen como líneas en blanco para rellenar a mano."],
+      notes: [
+        "Si nadie ha fichado en un turno, las horas aparecen como líneas en blanco para rellenar a mano.",
+        "Cada trabajador rellena su propio parte en el móvil. Aquí se juntan en uno por turno: un punto de la lista sale marcado si cualquiera lo marcó, las incidencias aparecen todas con el nombre de quien las escribió y se usa la firma del cliente más reciente.",
+      ],
     },
     {
       slug: "app-movil-agenda",
@@ -305,7 +309,7 @@ export const area: HelpArea = {
       steps: [
         { title: "Abre tu agenda", text: "Pulsa **Agenda** en la barra inferior. Verás tus turnos publicados de las próximas tres semanas, agrupados por día." },
         { title: "Lee cada turno", text: "Cada tarjeta muestra el horario, la fase, el proyecto, la dirección y el vehículo. Debajo aparece tu estado: **Pendiente**, **Confirmado** o **Rechazado**." },
-        { title: "Confirma o rechaza", text: "Pulsa **Confirmar** si vas a ir o **Rechazar** si no puedes." },
+        { title: "Confirma o rechaza", text: "Pulsa **Confirmar** si vas a ir o **Rechazar** si no puedes. Al rechazar, se avisa a los planificadores para que busquen sustituto." },
         { title: "Cambia de opinión", text: "Si ya confirmaste y te surge algo, pulsa **No puedo ir**. Si lo habías rechazado, aún puedes pulsar **Confirmar** mientras el turno no haya terminado." },
         { title: "Abre el detalle", text: "Pulsa la tarjeta para ver el turno completo: **Cómo llegar**, notas de acceso, carpas con **Ver plano y 3D**, el **Despiece** y la **Cuadrilla** con botón para llamar a cada compañero." },
       ],
@@ -328,7 +332,7 @@ export const area: HelpArea = {
         { title: "Ficha la salida", text: "Pulsa **Fichar salida**. Tus registros aparecen en **Últimos fichajes** con las horas trabajadas." },
       ],
       notes: [
-        "También puedes fichar desde el detalle de un turno con **Fichar entrada en este turno** y **Fichar salida**. En ese caso la salida se guarda sin pausa ni dieta; si las necesitas, ficha la salida desde la pestaña **Fichar**.",
+        "También puedes fichar desde el detalle de un turno con **Fichar entrada en este turno** y **Fichar salida**. Antes de fichar la salida puedes indicar igual la **Pausa (min)** y la **Dieta**.",
         "Si te equivocas, pide a tu responsable que corrija el fichaje desde Personal > Fichajes.",
       ],
     },

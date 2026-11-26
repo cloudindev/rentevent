@@ -6,6 +6,7 @@ import {
   BOM_GROUP_LABELS,
   computeCompositionBom,
   defaultConfiguration,
+  gutterFromItems,
   LAYOUT_LABELS,
   type BomItem,
   type BomRule,
@@ -45,7 +46,8 @@ export function VisorClient({ families, items, rules, vehicles }: Props) {
   const famById = useMemo(() => new Map(families.map((f) => [f.id, f])), [families]);
   const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
 
-  const bom = useMemo(() => computeCompositionBom({ composition, families, rules, items, vehicles }), [composition, families, rules, items, vehicles]);
+  const gutter = useMemo(() => gutterFromItems(items), [items]);
+  const bom = useMemo(() => computeCompositionBom({ composition, families, rules, items, vehicles, gutter }), [composition, families, rules, items, vehicles, gutter]);
 
   const tent = composition.tents.find((t) => t.id === selected) ?? composition.tents[0]!;
   const fam = famById.get(tent.config.familyId)!;
