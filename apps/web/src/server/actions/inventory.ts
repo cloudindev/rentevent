@@ -12,7 +12,7 @@ import { logUnitEvents, moveUnit as moveUnitSvc, packUnit as packUnitSvc, setBul
 const itemInput = z.object({
   id: z.string().uuid().nullable(),
   sku: z.string().trim().min(1, "Obligatorio").max(40),
-  name: z.string().trim().min(2, "Obligatorio").max(120),
+  name: z.string().trim().min(2, "Obligatorio").max(500),
   category: z.string().trim().min(1).max(60),
   kind: z.enum(["granel", "seriado", "consumible", "servicio"]),
   unit: z.enum(["ud", "m2", "m", "ml", "rollo", "kg"]),
@@ -58,7 +58,7 @@ export const saveItem = tenantAction(itemInput, "inventario", async (input, tx, 
 
 /** Inline edit from the table (single field). */
 export const patchItem = tenantAction(
-  z.object({ id: z.string().uuid(), field: z.enum(["stockTotal", "price", "location", "name", "category"]), value: z.string().max(120) }),
+  z.object({ id: z.string().uuid(), field: z.enum(["stockTotal", "price", "location", "name", "category"]), value: z.string().max(500) }),
   "inventario",
   async ({ id, field, value }, tx, ctx) => {
     const [before] = await tx.select().from(items).where(eq(items.id, id));
