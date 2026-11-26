@@ -4,6 +4,7 @@ import { z } from "zod";
 import { and, eq, invitation, member, organization, systemDb, user } from "@rentevent/db";
 import { randomBytes } from "node:crypto";
 import { auth } from "@/lib/auth";
+import { acceptSeatProblem } from "../billing/tenant-access";
 import { ACTIVE_TENANT_COOKIE, getAuthSession } from "../context";
 import { normaliseSlug, provisionTenant, slugAvailable } from "../provisioning";
 
@@ -70,6 +71,10 @@ export async function acceptInvitation(id: string): Promise<FormState> {
   if (inv.email.toLowerCase() !== s.user.email.toLowerCase()) return { ok: false, error: `Esta invitación es para ${inv.email}. Entra con esa cuenta.` };
   const db = systemDb();
   const [already] = await db.select().from(member).where(and(eq(member.organizationId, inv.orgId), eq(member.userId, s.user.id)));
+  if (!already) {
+    const full = await acceptSeatProblem(inv.orgId);
+    if (full) return { ok: false, error: full };
+  }
   if (!already) await db.insert(member).values({ id: `mem_${randomBytes(10).toString("hex")}`, organizationId: inv.orgId, userId: s.user.id, role: inv.role ?? "solo_lectura" });
   await db.update(invitation).set({ status: "accepted" }).where(eq(invitation.id, id));
   (await cookies()).set(ACTIVE_TENANT_COOKIE, inv.slug, { httpOnly: true, sameSite: "lax", path: "/", secure: process.env.NODE_ENV === "production" });
@@ -81,6 +86,8 @@ export async function signUpInvited(input: { invitationId: string; name: string;
   if (!inv || inv.status !== "pending" || inv.expiresAt < new Date()) return { ok: false, error: "La invitación ya no es válida." };
   if (input.password.length < 10) return { ok: false, fieldErrors: { password: "Mínimo 10 caracteres" } };
   if (input.name.trim().length < 2) return { ok: false, fieldErrors: { name: "Indica tu nombre" } };
+  const full = await acceptSeatProblem(inv.orgId);
+  if (full) return { ok: false, error: full };
   const [existing] = await systemDb().select({ id: user.id }).from(user).where(eq(user.email, inv.email));
   if (existing) return { ok: false, error: "Ya tienes cuenta con este correo: inicia sesión para aceptar." };
   await auth.api.signUpEmail({ body: { name: input.name.trim(), email: inv.email, password: input.password, callbackURL: `/invitacion/${inv.id}` }, headers: await headers() });

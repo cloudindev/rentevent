@@ -42,3 +42,19 @@ export async function assertApiIncluded(tx: Tx) {
   const access = await loadPlanAccess(tx);
   if (!access.api) throw new UserError(`La API y los webhooks están incluidos en el plan ${planWith("api")?.name ?? "Empresa"}.`);
 }
+
+/**
+ * Seat check at the moment an invitation is accepted. Seats are reserved when
+ * inviting, but a plan downgrade can leave more pending invitations than free
+ * seats, so only current members count here. Returns the message to show, or null.
+ */
+export async function acceptSeatProblem(tenantId: string): Promise<string | null> {
+  const [s] = await systemDb()
+    .select({ plan: tenantSettings.plan, planSeats: tenantSettings.planSeats, subscriptionStatus: tenantSettings.subscriptionStatus, trialEndsAt: tenantSettings.trialEndsAt })
+    .from(tenantSettings)
+    .where(eq(tenantSettings.tenantId, tenantId));
+  const access = planAccess(s);
+  if (access.seatLimit == null) return null;
+  const { members } = await seatsInUse(tenantId);
+  return members >= access.seatLimit ? "Esta empresa no tiene plazas libres en su plan. Pide al administrador que amplíe las plazas en Configuración > Suscripción y vuelve a abrir este enlace." : null;
+}

@@ -4,6 +4,7 @@ import { AuthSplit } from "@/components/auth-split";
 import { ROLE_LABELS } from "@/lib/permissions";
 import type { Role } from "@rentevent/db/schema";
 import { invitationInfo } from "@/server/actions/auth";
+import { acceptSeatProblem } from "@/server/billing/tenant-access";
 import { getAuthSession } from "@/server/context";
 import { InvitationActions } from "./actions";
 
@@ -14,6 +15,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ id:
   const inv = await invitationInfo(id);
   const session = await getAuthSession();
   const valid = inv && inv.status === "pending" && inv.expiresAt > new Date();
+  const full = valid ? await acceptSeatProblem(inv.orgId) : null;
   return (
     <AuthSplit>
       {!valid ? (
@@ -32,7 +34,13 @@ export default async function InvitationPage({ params }: { params: Promise<{ id:
             Rol: <strong className="text-foreground">{ROLE_LABELS[(inv.role ?? "solo_lectura") as Role]}</strong> · para {inv.email}
           </p>
           <div className="mt-6">
-            <InvitationActions id={inv.id} email={inv.email} signedInAs={session?.user.email ?? null} />
+            {full ? (
+              <p role="alert" className="rounded-lg bg-warning-bg px-3 py-2 text-sm">
+                {full}
+              </p>
+            ) : (
+              <InvitationActions id={inv.id} email={inv.email} signedInAs={session?.user.email ?? null} />
+            )}
           </div>
         </>
       )}

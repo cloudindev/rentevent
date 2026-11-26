@@ -203,7 +203,10 @@ export const area: HelpArea = {
           text: "Pulsa **Inicia sesión** debajo del formulario. Tras entrar volverás a la invitación para aceptarla.",
         },
       ],
-      notes: ["Las invitaciones pendientes también aparecen en **Espacios de trabajo** con el texto Invitación a y el nombre de la empresa."],
+      notes: [
+        "Las invitaciones pendientes también aparecen en **Espacios de trabajo** con el texto Invitación a y el nombre de la empresa.",
+        "Si la empresa ya ha cubierto todas las plazas de su plan, la invitación no se puede aceptar hasta que el administrador amplíe las plazas en **Configuración › Suscripción**.",
+      ],
     },
     {
       slug: "navegar-back-office",
