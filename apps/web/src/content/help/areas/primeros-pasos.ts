@@ -149,7 +149,7 @@ export const area: HelpArea = {
         },
       ],
       notes: [
-        "Tras 5 intentos fallidos la cuenta se bloquea 15 minutos. Puedes esperar o restablecer la contraseña.",
+        "Equivocarte con la contraseña no bloquea la cuenta: puedes volver a intentarlo enseguida o pulsar **¿Has olvidado la contraseña?**.",
         "Si el correo aún no está confirmado, verás el aviso para confirmarlo antes de entrar.",
         "Los usuarios con rol Montador entran directamente en la app móvil de campo en lugar del back office.",
       ],

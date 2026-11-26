@@ -28,8 +28,8 @@ export function LoginForm() {
       setError(
         error.status === 403 && /verif/i.test(error.message ?? "")
           ? "Confirma tu correo antes de entrar. Te hemos reenviado el enlace."
-          : error.message && /bloquead/i.test(error.message)
-            ? error.message
+          : error.status === 429
+            ? "Demasiados intentos seguidos. Espera unos segundos y vuelve a probar."
             : "Correo o contraseña incorrectos.",
       );
       return;
